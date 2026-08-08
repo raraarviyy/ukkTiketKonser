@@ -1,25 +1,51 @@
-import logo from './logo.svg';
-import './App.css';
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { FavoriteProvider } from "./user/context/FavoriteContext"; // 1. Import FavoriteProvider
+import { TransactionProvider } from "./user/context/TransactionContext"; // Import TransactionProvider
+import Landing from "./landing/app";
+import Register from "./register/app";
+import Login from "./login/app";
+import Home from "./user/home/app";
+import Explore from "./user/explore/app";
+import EventDetail from "./user/detail/app";
+import MyTickets from "./user/my-tickets/app";
+import History from "./user/history/app";
+import Checkout from "./user/Checkout/app";
+import Cart from "./user/cart/app";                   
+import Favorites from "./user/favorites/app";
+import Notifications from "./user/notifications/app";
+import Profile from "./user/profile/app";
 
-function App() {
+export default function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <TransactionProvider>
+      <FavoriteProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/home" element={<Home />} />
+            <Route path="/explore" element={<Explore />} />
+            <Route path="/detail/:id" element={<EventDetail />} />
+            <Route path="/my-tickets" element={<MyTickets />} />
+            <Route path="/history" element={<History />} />
+            <Route path="/checkout" element={<Checkout />} />
+            <Route path="/favorites" element={<Favorites />} />
+            <Route path="/cart" element={<Cart />} />
+            <Route path="/notifications" element={<Notifications />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route
+              path="*"
+              element={
+                <div style={{ padding: "60px", textAlign: "center", color: "#fff", backgroundColor: "#0b0c10", minHeight: "100vh" }}>
+                  <h1 style={{ fontSize: "32px", color: "#ec4899" }}>404 - Page Not Found</h1>
+                  <p style={{ color: "#9ca3af" }}>Halaman yang kamu cari tidak ditemukan.</p>
+                </div>
+              }
+            />
+          </Routes>
+        </BrowserRouter>
+      </FavoriteProvider>
+    </TransactionProvider>
   );
 }
-
-export default App;
