@@ -1,0 +1,209 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                Int            @id @default(autoincrement())
+  name              String
+  email             String         @unique
+  password          String
+  role              Int            @map("role")
+  phone_number      String?
+  organization_name String?
+  status            String         @default("active") // active, suspended, inactive
+  profile_picture   String?
+  created_at        DateTime       @default(now())
+  updated_at        DateTime       @updatedAt
+
+  // Relasi
+  role_relation     Role           @relation(fields: [role], references: [id])
+  organized_events  Event[]        @relation("OrganizerEvents")
+  orders            Order[]
+  tickets           Ticket[]
+  favorites         Favorite[]
+  notifications     Notification[]
+  reviews           Review[]
+
+  @@map("users")
+}
+
+model Role {
+  id         Int      @id @default(autoincrement())
+  name       String   @unique
+  created_at DateTime @default(now())
+
+  // Relasi
+  users User[]
+
+  @@map("roles")
+}
+
+model Category {
+  id         Int      @id @default(autoincrement())
+  name       String   @unique
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relasi
+  events Event[]
+
+  @@map("categories")
+}
+
+model Event {
+  id            Int          @id @default(autoincrement())
+  title         String
+  artist        String
+  venue         String
+  city          String
+  address       String
+  latitude      Float?
+  longitude     Float?
+  event_date    DateTime     @map("event_date")
+  doors_open    String?
+  show_starts   String?
+  age_limit     String?
+  category_id   Int          @map("category_id")
+  organizer_id  Int?         @map("organizer_id")
+  status        String       @default("approved") // pending, approved, rejected
+  reject_reason String?      @map("reject_reason")
+  image         String?
+  description   String?
+  tag           String?
+  secondary_tag String?
+  created_at    DateTime     @default(now())
+  updated_at    DateTime     @updatedAt
+
+  // Relasi
+  category     Category     @relation(fields: [category_id], references: [id])
+  organizer    User?        @relation("OrganizerEvents", fields: [organizer_id], references: [id], onDelete: SetNull)
+  ticket_types TicketType[]
+  orders       Order[]
+  tickets      Ticket[]
+  favorites    Favorite[]
+  reviews      Review[]
+
+  @@map("events")
+}
+
+model TicketType {
+  id         Int      @id @default(autoincrement())
+  event_id   Int      @map("event_id")
+  type       String // "regular" | "vip" | "festival" | "early_bird" etc.
+  name       String
+  price      Decimal  @db.Decimal(12, 2)
+  badge      String?
+  benefits   Json? // array of string benefit
+  quota      Int      @default(0)
+  sold       Int      @default(0)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relasi
+  event   Event    @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  orders  Order[]
+  tickets Ticket[]
+
+  @@map("ticket_types")
+}
+
+model Order {
+  id             Int       @id @default(autoincrement())
+  order_code     String    @unique
+  invoice_id     String    @unique
+  user_id        Int       @map("user_id")
+  event_id       Int       @map("event_id")
+  ticket_type_id Int       @map("ticket_type_id")
+  quantity       Int
+  subtotal       Decimal   @db.Decimal(12, 2)
+  tax            Decimal   @db.Decimal(12, 2)
+  total          Decimal   @db.Decimal(12, 2)
+  payment_method String
+  status         String    @default("pending") // pending, paid, failed, cancelled
+  paid_at        DateTime?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+
+  // Relasi
+  user        User       @relation(fields: [user_id], references: [id])
+  event       Event      @relation(fields: [event_id], references: [id])
+  ticket_type TicketType @relation(fields: [ticket_type_id], references: [id])
+  tickets     Ticket[]
+
+  @@map("orders")
+}
+
+model Ticket {
+  id             Int      @id @default(autoincrement())
+  ticket_code    String   @unique
+  order_id       Int      @map("order_id")
+  user_id        Int      @map("user_id")
+  event_id       Int      @map("event_id")
+  ticket_type_id Int      @map("ticket_type_id")
+  seat           String   @default("General Admission")
+  status         String   @default("upcoming") // upcoming, used, expired, cancelled
+  qr_code_url    String?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  // Relasi
+  order       Order      @relation(fields: [order_id], references: [id])
+  user        User       @relation(fields: [user_id], references: [id])
+  event       Event      @relation(fields: [event_id], references: [id])
+  ticket_type TicketType @relation(fields: [ticket_type_id], references: [id])
+
+  @@map("tickets")
+}
+
+model Favorite {
+  id         Int      @id @default(autoincrement())
+  user_id    Int      @map("user_id")
+  event_id   Int      @map("event_id")
+  created_at DateTime @default(now())
+
+  // Relasi
+  user  User  @relation(fields: [user_id], references: [id])
+  event Event @relation(fields: [event_id], references: [id])
+
+  @@unique([user_id, event_id])
+  @@map("favorites")
+}
+
+model Notification {
+  id         Int      @id @default(autoincrement())
+  user_id    Int      @map("user_id")
+  title      String
+  message    String
+  type       String   @default("system") // system, payment, booking, reminder
+  is_read    Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  // Relasi
+  user User @relation(fields: [user_id], references: [id])
+
+  @@map("notifications")
+}
+
+model Review {
+  id         Int      @id @default(autoincrement())
+  user_id    Int      @map("user_id")
+  event_id   Int      @map("event_id")
+  rating     Int // 1 - 5
+  comment    String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relasi
+  user  User  @relation(fields: [user_id], references: [id])
+  event Event @relation(fields: [event_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, event_id])
+  @@map("reviews")
+}
