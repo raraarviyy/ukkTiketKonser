@@ -1,3 +1,5 @@
+// src/user/home/app.js
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../../components/Sidebar';
@@ -6,6 +8,8 @@ import { Ticket, MapPin, Heart, Loader2 } from 'lucide-react';
 import { useFavorites } from '../context/FavoriteContext';
 import { api } from '../../api';
 
+const HOME_EVENT_LIMIT = 10;
+
 export default function Home() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('home');
@@ -13,19 +17,41 @@ export default function Home() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  React.useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        const data = await api.getEvents();
-        setEvents(data);
-      } catch (error) {
-        console.error("Failed to fetch events", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+React.useEffect(() => {
+  const fetchEvents = async () => {
+    try {
+      setLoading(true);
+
+      const data = await api.getFeaturedEvents(
+        HOME_EVENT_LIMIT
+      );
+
+      setEvents(data);
+    } catch (error) {
+      console.error('Failed to fetch events', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchEvents();
+
+  const handleDataChanged = () => {
     fetchEvents();
-  }, []);
+  };
+
+  window.addEventListener(
+    'auralis:data-changed',
+    handleDataChanged
+  );
+
+  return () => {
+    window.removeEventListener(
+      'auralis:data-changed',
+      handleDataChanged
+    );
+  };
+}, []);
 
   const { toggleFavorite, isFavorite } = useFavorites();
 
@@ -103,11 +129,11 @@ export default function Home() {
               </div>
             )}
 
-            {/* Recommended Section */}
+            {/* Recommended Section — tampil 10 konser (lihat HOME_EVENT_LIMIT) */}
             <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '16px' }}>Recommended For You</h2>
 
             <div className="events-grid">
-              {events.slice(0, 6).map((event) => {
+              {events.map((event) => {
                 const favorited = isFavorite(event.id);
                 return (
                   <div

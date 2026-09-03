@@ -1,306 +1,786 @@
-const INITIAL_EVENTS = [
+const STORAGE_KEY = 'auralis_events_data';
+const HISTORY_KEY = 'auralis_history_data';
+const TICKETS_KEY = 'auralis_tickets_data';
+const NOTIFICATIONS_KEY = 'auralis_notifications_data';
+const FAVORITES_KEY = 'auralis_favorites_data';
+const REVIEWS_KEY = 'auralis_reviews_data';
+const USERS_KEY = 'auralis_users_data';
+const TRANSACTIONS_KEY = 'auralis_transactions_data';
+const ADMIN_NOTIF_KEY = 'auralis_admin_notif_data';
+const AUDIT_KEY = 'auralis_audit_log';
+const SETTLEMENT_KEY = 'auralis_settlement_data';
+const PLATFORM_FEE_KEY = 'auralis_platform_fee';
+const WALLET_KEY = 'auralis_wallet_data';
+const WITHDRAWAL_KEY = 'auralis_withdrawal_data';
+
+const seedEvents = [
   {
-    id: '1',
-    title: 'Neon Pulse Tour 2026',
-    artist: 'Cyber Pulse & Friends',
-    venue: 'Cyber Arena, Tokyo',
-    city: 'Tokyo',
-    address: '1-1-1 Ariake, Koto City, Tokyo 135-0063, Japan',
-    lat: 35.6298,
-    lng: 139.7942,
-    date: 'OCT 24, 2026',
-    time: '19:00 PM',
-    doorsOpen: '19:00 PM',
-    showStarts: '20:30 PM',
-    ageLimit: '18+',
-    category: 'Concert',
-    price: 89,
-    image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=1200&q=80',
-    description: 'Saksikan pertunjukan musik futuristik paling dinanti tahun ini! Nikmati pengalaman visual neon spektakuler dan tata suara berteknologi tinggi bersama Cyber Pulse & Friends di Cyber Arena, Tokyo.',
-    tag: 'LIVE EXPERIENCE',
-    secondaryTag: 'SELLING FAST',
-    tickets: [
-      { type: 'regular', name: 'Regular Pass', price: 89, badge: 'General Admission', benefits: ['Akses Area Regular', 'Standard Sound Zone', 'E-Ticket QR Code'] },
-      { type: 'vip', name: 'VIP Pulse Pass', price: 180, badge: 'VIP Front Zone', benefits: ['Akses Panggung Utama (Front Stage)', 'Jalur Antrean Khusus (Fast Track)', 'Paket Exclusive Merchandise', 'Free Drink Voucher'] }
-    ]
-  },
-  {
-    id: '2',
-    title: 'Summer Solstice Fest',
-    artist: 'Various Artists',
-    venue: 'SoFi Stadium, LA',
-    city: 'Los Angeles',
-    address: '1001 Stadium Dr, Inglewood, CA 90301, USA',
-    lat: 33.9535,
-    lng: -118.3392,
-    date: 'JUL 22, 2026',
-    time: '16:00 PM',
-    doorsOpen: '16:00 PM',
-    showStarts: '17:30 PM',
-    ageLimit: 'All Ages',
-    category: 'Festival',
-    price: 125,
-    image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=1200&q=80',
-    description: 'Festival musik musim panas terbesar di Los Angeles. Menampilkan puluhan artis papan atas internasional di 3 panggung megah secara bersamaan.',
-    tag: 'EXCLUSIVE',
-    secondaryTag: 'HOT SALE',
-    tickets: [
-      { type: 'regular', name: 'Regular Fest Pass', price: 125, badge: 'General Admission', benefits: ['Akses Semua Panggung Festival', 'Akses Food & Beverage Area', 'E-Ticket Pass'] },
-      { type: 'vip', name: 'VIP Super Pass', price: 250, badge: 'VIP Deck', benefits: ['Akses VIP Lounge & Private Bar', 'Viewing Deck Dekat Panggung', 'Akses Pintu Masuk Prioritas', 'Exclusive Fest Lanyard'] }
-    ]
-  },
-  {
-    id: '3',
-    title: 'Acoustic Unplugged',
-    artist: 'The Unplugged Sessions',
-    venue: 'Royal Albert Hall, London',
-    city: 'London',
-    address: 'Kensington Gore, London SW7 2AP, UK',
-    lat: 51.5009,
-    lng: -0.1774,
-    date: 'AUG 15, 2026',
-    time: '20:00 PM',
-    doorsOpen: '19:30 PM',
-    showStarts: '20:00 PM',
-    ageLimit: '16+',
-    category: 'Acoustic',
-    price: 65,
-    image: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=1200&q=80',
-    description: 'Nikmati suasana malam intim dan syahdu dengan lantunan instrumen akustik dari musisi-musisi ternama di gedung bersejarah Royal Albert Hall.',
-    tag: 'POPULAR',
-    secondaryTag: 'ALMOST SOLD OUT',
-    tickets: [
-      { type: 'regular', name: 'Balcony Seat', price: 65, badge: 'Numbered Seat', benefits: ['Duduk Sesuai Nomor Kursi Balkon', 'Kualitas Akustik Ruangan Terbaik', 'E-Ticket QR Code'] },
-      { type: 'vip', name: 'VIP Box Seat', price: 140, badge: 'VIP Private Box', benefits: ['Private VIP Box Seat', 'Welcome Champagne / Drink', 'Layanan Private Service Staff', 'Meet & Greet Voucher'] }
-    ]
-  },
-  {
-    id: '4',
-    title: 'Electric Nights',
-    artist: 'DJ Nova',
-    venue: 'Velvet Club, Berlin',
-    city: 'Berlin',
-    address: 'Ritterstraße 26, 10969 Berlin, Germany',
-    lat: 52.5111,
-    lng: 13.4102,
-    date: 'SEP 05, 2026',
-    time: '22:00 PM',
-    doorsOpen: '22:00 PM',
-    showStarts: '23:00 PM',
-    ageLimit: '21+',
-    category: 'EDM',
-    price: 95,
-    image: 'https://images.unsplash.com/photo-1571266028243-d220c9e4d1b8?auto=format&fit=crop&w=1200&q=80',
-    description: 'Malam klub bawah tanah dengan set eksklusif dari DJ Nova. Sistem tata suara berkelas dunia dan visual laser yang memukau sepanjang malam.',
-    tag: 'UNDERGROUND',
-    secondaryTag: 'LATE NIGHT',
-    tickets: [
-      { type: 'regular', name: 'Dance Floor Pass', price: 95, badge: 'General Admission', benefits: ['Akses Dance Floor Utama', 'Free Loker Penitipan', 'E-Ticket QR Code'] },
-      { type: 'vip', name: 'VIP Booth', price: 190, badge: 'Private Booth', benefits: ['Private Booth & Meja', 'Bottle Service', 'Fast Entry Line', 'Merchandise Eksklusif'] }
-    ]
-  },
-  {
-    id: '5',
-    title: 'Indie Waves Festival',
-    artist: 'The Wandering Echoes',
-    venue: 'Brooklyn Steel, NYC',
-    city: 'New York City',
-    address: '319 Frost St, Brooklyn, NY 11222, USA',
-    lat: 40.7145,
-    lng: -73.9425,
-    date: 'JUN 10, 2026',
-    time: '18:00 PM',
-    doorsOpen: '18:00 PM',
-    showStarts: '19:00 PM',
-    ageLimit: '18+',
-    category: 'Indie',
-    price: 70,
-    image: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=1200&q=80',
-    description: 'Deretan band indie underground terbaik tampil dalam satu panggung intim di Brooklyn Steel, membawa nuansa lirik puitis dan melodi yang jujur.',
-    tag: 'INDIE PICK',
-    secondaryTag: 'NEW ARRIVAL',
-    tickets: [
-      { type: 'regular', name: 'Standing Pass', price: 70, badge: 'General Admission', benefits: ['Akses Standing Area', 'Merchandise Booth Access', 'E-Ticket QR Code'] },
-      { type: 'vip', name: 'VIP Balcony', price: 140, badge: 'Reserved Balcony', benefits: ['Kursi Balkon Reserved', 'Akses Meet & Greet', 'Welcome Drink', 'Priority Entry'] }
-    ]
-  },
-  {
-    id: '6',
-    title: 'Jazz & Wine Evening',
-    artist: 'Miles Harmony Quartet',
-    venue: 'Blue Note, NYC',
-    city: 'New York City',
-    address: '131 W 3rd St, New York, NY 10012, USA',
-    lat: 40.7308,
-    lng: -73.9973,
-    date: 'NOV 02, 2026',
-    time: '20:00 PM',
-    doorsOpen: '19:00 PM',
-    showStarts: '20:00 PM',
-    ageLimit: '21+',
+    id: 'evt-1',
+    title: 'Harmoni Malam Jazz',
+    artist: 'Tulus & Friends',
+    venue: 'Balai Sarbini',
+    city: 'Jakarta',
+    date: '2026-09-20',
+    time: '20:00',
     category: 'Jazz',
-    price: 55,
-    image: 'https://images.unsplash.com/photo-1415201364774-f6f0bb35f28f?auto=format&fit=crop&w=1200&q=80',
-    description: 'Malam jazz intim ditemani segelas wine pilihan bersama Miles Harmony Quartet di klub jazz legendaris New York.',
-    tag: 'INTIMATE',
-    secondaryTag: 'LIMITED SEATS',
+    secondaryTag: 'Jazz',
+    tag: 'Featured',
+    description: 'Malam apresiasi musik jazz kontemporer dengan lineup lokal terbaik.',
+    lineup: ['Tulus', 'Kunto Aji', 'Rara Sekar'],
+    image: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800',
+    address: 'Jl. Sisingamangaraja No.73, Jakarta Selatan',
+    lat: -6.2297,
+    lng: 106.8175,
+    doorsOpen: '19:00',
+    showStarts: '20:00',
+    ageLimit: '17+',
+    status: 'published',
+    organizerId: 'org-001',
+    price: 45,
+    categories: [
+      { id: 'cat-1', name: 'VIP', price: 120, quota: 100, sold: 62 },
+      { id: 'cat-2', name: 'Reguler', price: 45, quota: 500, sold: 310 }
+    ],
     tickets: [
-      { type: 'regular', name: 'Table Seat', price: 55, badge: 'Shared Table', benefits: ['Kursi Meja Bersama', '1 Welcome Drink', 'E-Ticket QR Code'] },
-      { type: 'vip', name: 'VIP Front Table', price: 120, badge: 'Front Row Table', benefits: ['Meja Baris Depan', 'Wine Pairing Set', 'Layanan Personal Waiter', 'Merchandise Signed'] }
+      { type: 'regular', name: 'Reguler', price: 45, benefits: ['Akses area umum', 'E-ticket QR'] },
+      { type: 'vip', name: 'VIP', price: 120, benefits: ['Akses area depan', 'Merchandise eksklusif', 'Fast entry'] }
     ]
   },
   {
-    id: '7',
-    title: 'Pop Sensation Live',
-    artist: 'Luna Star',
-    venue: 'Crypto.com Arena, LA',
-    city: 'Los Angeles',
-    address: '1111 S Figueroa St, Los Angeles, CA 90015, USA',
-    lat: 34.0430,
-    lng: -118.2673,
-    date: 'DEC 12, 2026',
-    time: '19:30 PM',
-    doorsOpen: '18:30 PM',
-    showStarts: '19:30 PM',
-    ageLimit: 'All Ages',
-    category: 'Pop',
-    price: 110,
-    image: 'https://images.unsplash.com/photo-1524368535928-5b5e00ddc76b?auto=format&fit=crop&w=1200&q=80',
-    description: 'Konser tunggal Luna Star dengan produksi panggung megah, koreografi spektakuler, dan setlist lagu-lagu hits terbarunya.',
-    tag: 'MEGA SHOW',
-    secondaryTag: 'FAN FAVORITE',
+    id: 'evt-2',
+    title: 'Festival Suara Kota',
+    artist: 'Berbagai Artis',
+    venue: 'GBK Senayan',
+    city: 'Jakarta',
+    date: '2026-10-05',
+    time: '16:00',
+    category: 'Festival',
+    secondaryTag: 'Festival',
+    tag: 'Popular',
+    description: 'Festival musik tahunan lintas genre dengan puluhan artis nasional.',
+    lineup: ['Raisa', 'Rich Brian', 'Fourtwnty'],
+    image: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800',
+    address: 'Jl. Pintu Satu Senayan, Jakarta Pusat',
+    lat: -6.2183,
+    lng: 106.8027,
+    doorsOpen: '15:00',
+    showStarts: '16:00',
+    ageLimit: 'Semua umur',
+    status: 'published',
+    organizerId: 'org-001',
+    price: 60,
+    categories: [
+      { id: 'cat-3', name: 'VIP', price: 150, quota: 200, sold: 40 },
+      { id: 'cat-4', name: 'Reguler', price: 60, quota: 1000, sold: 210 }
+    ],
     tickets: [
-      { type: 'regular', name: 'Regular Seat', price: 110, badge: 'Numbered Seat', benefits: ['Kursi Sesuai Nomor', 'Akses Merchandise Booth', 'E-Ticket QR Code'] },
-      { type: 'vip', name: 'VIP Gold Circle', price: 220, badge: 'Gold Circle', benefits: ['Area Gold Circle Terdekat Panggung', 'Early Entry', 'Exclusive Tour Merchandise', 'Soundcheck Party Access'] }
+      { type: 'regular', name: 'Reguler', price: 60, benefits: ['Akses area umum', 'E-ticket QR'] },
+      { type: 'vip', name: 'VIP', price: 150, benefits: ['Akses tribun VIP', 'Merchandise', 'Parkir khusus'] }
     ]
   },
   {
-    id: '8',
-    title: 'Rock Revolution',
-    artist: 'Thunder Reign',
-    venue: 'The O2 Arena, London',
-    city: 'London',
-    address: 'Peninsula Square, London SE10 0DX, UK',
-    lat: 51.5030,
-    lng: 0.0032,
-    date: 'OCT 30, 2026',
-    time: '19:00 PM',
-    doorsOpen: '18:00 PM',
-    showStarts: '19:00 PM',
-    ageLimit: '16+',
+    id: 'evt-3',
+    title: 'Indie Night Out',
+    artist: 'Payung Teduh',
+    venue: 'Motion Blue',
+    city: 'Bandung',
+    date: '2026-11-12',
+    time: '19:30',
+    category: 'Indie',
+    secondaryTag: 'Indie',
+    tag: 'New',
+    description: 'Malam penuh keintiman bersama Payung Teduh dan kolaborator spesial.',
+    lineup: ['Payung Teduh', 'Hindia', 'Reality Club'],
+    image: 'https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?w=800',
+    address: 'Jl. Asia Afrika No. 145, Bandung',
+    lat: -6.9175,
+    lng: 107.6191,
+    doorsOpen: '18:30',
+    showStarts: '19:30',
+    ageLimit: 'Semua umur',
+    status: 'published',
+    organizerId: 'org-002',
+    price: 75,
+    categories: [
+      { id: 'cat-5', name: 'VIP', price: 200, quota: 50, sold: 30 },
+      { id: 'cat-6', name: 'Reguler', price: 75, quota: 300, sold: 180 }
+    ],
+    tickets: [
+      { type: 'regular', name: 'Reguler', price: 75, benefits: ['Akses area umum', 'E-ticket QR'] },
+      { type: 'vip', name: 'VIP', price: 200, benefits: ['Meet & Greet', 'Merchandise eksklusif'] }
+    ]
+  },
+  {
+    id: 'evt-4',
+    title: 'EDM Takeover Bali',
+    artist: 'DJ Martin Garrix',
+    venue: 'GWK Cultural Park',
+    city: 'Bali',
+    date: '2026-12-31',
+    time: '21:00',
+    category: 'EDM',
+    secondaryTag: 'EDM',
+    tag: 'Hot',
+    description: 'Rayakan tahun baru dengan dentuman bass EDM internasional.',
+    lineup: ['Martin Garrix', 'Alesso', 'Dipha Barus'],
+    image: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800',
+    address: 'Jl. Raya Uluwatu, Ungasan, Kuta Selatan, Bali',
+    lat: -8.8101,
+    lng: 115.1686,
+    doorsOpen: '20:00',
+    showStarts: '21:00',
+    ageLimit: '21+',
+    status: 'published',
+    organizerId: 'org-001',
+    price: 200,
+    categories: [
+      { id: 'cat-7', name: 'VVIP', price: 500, quota: 50, sold: 12 },
+      { id: 'cat-8', name: 'VIP', price: 300, quota: 150, sold: 78 },
+      { id: 'cat-9', name: 'Reguler', price: 200, quota: 800, sold: 450 }
+    ],
+    tickets: [
+      { type: 'regular', name: 'Reguler', price: 200, benefits: ['Akses area umum', 'E-ticket QR'] },
+      { type: 'vip', name: 'VIP', price: 300, benefits: ['Area VIP khusus', 'Bar premium'] },
+      { type: 'vip', name: 'VVIP', price: 500, benefits: ['Lounge eksklusif', 'Open bar', 'Backstage pass'] }
+    ]
+  },
+  {
+    id: 'evt-5',
+    title: 'Rock N Loud',
+    artist: 'Burgerkill',
+    venue: 'Istora Senayan',
+    city: 'Jakarta',
+    date: '2026-10-18',
+    time: '18:00',
     category: 'Rock',
-    price: 99,
-    image: 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=1200&q=80',
-    description: 'Thunder Reign kembali menggelegar dengan tur dunia terbarunya, menghadirkan riff gitar menggelegar dan produksi panggung penuh api.',
-    tag: 'ARENA TOUR',
-    secondaryTag: 'BEST SELLER',
+    secondaryTag: 'Rock',
+    tag: 'Featured',
+    description: 'Festival rock terbesar dengan dentuman keras band metal lokal terbaik.',
+    lineup: ['Burgerkill', 'Seringai', 'Beside'],
+    image: 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=800',
+    address: 'Jl. Pintu Satu Senayan, Jakarta Pusat',
+    lat: -6.2185,
+    lng: 106.8022,
+    doorsOpen: '17:00',
+    showStarts: '18:00',
+    ageLimit: '17+',
+    status: 'pending',
+    organizerId: 'org-002',
+    price: 150,
+    categories: [
+      { id: 'cat-10', name: 'VIP', price: 350, quota: 100, sold: 0 },
+      { id: 'cat-11', name: 'Reguler', price: 150, quota: 500, sold: 0 }
+    ],
     tickets: [
-      { type: 'regular', name: 'Standing GA', price: 99, badge: 'General Admission', benefits: ['Akses Standing Floor', 'Poster Eksklusif Tur', 'E-Ticket QR Code'] },
-      { type: 'vip', name: 'VIP Pit Pass', price: 200, badge: 'Front Pit', benefits: ['Akses Pit Terdepan', 'Early Entry & Soundcheck', 'Exclusive Merch Bundle', 'Laminate VIP Pass'] }
+      { type: 'regular', name: 'Reguler', price: 150, benefits: ['Akses area umum', 'E-ticket QR'] },
+      { type: 'vip', name: 'VIP', price: 350, benefits: ['Area VIP', 'Merchandise'] }
     ]
   }
 ];
 
-const INITIAL_NOTIFICATIONS = [
+const seedUsers = [
+  { id: 'org-001', name: 'Harmony Events', email: 'organizer@auralis.id', role: 'organizer', status: 'active', avatar: null, createdAt: '2026-01-15T08:00:00Z' },
+  { id: 'org-002', name: 'Bali Music Fest', email: 'balimusicfest@auralis.id', role: 'organizer', status: 'active', avatar: null, createdAt: '2026-02-10T08:00:00Z' },
+  { id: 'usr-001', name: 'Budi Santoso', email: 'budi@gmail.com', role: 'user', status: 'active', avatar: null, createdAt: '2026-03-01T10:00:00Z' },
+  { id: 'usr-002', name: 'Siti Rahayu', email: 'siti@gmail.com', role: 'user', status: 'active', avatar: null, createdAt: '2026-03-15T11:00:00Z' },
+  { id: 'usr-003', name: 'Ahmad Fauzi', email: 'ahmad@gmail.com', role: 'user', status: 'active', avatar: null, createdAt: '2026-04-20T09:00:00Z' }
+];
+
+const seedTransactions = [
   {
-    id: 'notif-1',
-    title: 'Welcome to VibePass!',
-    message: 'Find your favorite concerts and events here.',
-    type: 'system',
-    date: new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-    read: false
+    id: 'trx-001', userId: 'usr-001', userName: 'Budi Santoso', userEmail: 'budi@gmail.com',
+    eventId: 'evt-1', eventTitle: 'Harmoni Malam Jazz', ticketType: 'VIP', quantity: 2,
+    totalAmount: 240000, status: 'paid', paymentMethod: 'Transfer Bank', createdAt: '2026-08-10T14:30:00Z',
+    ticketIds: ['tkt-001', 'tkt-002']
+  },
+  {
+    id: 'trx-002', userId: 'usr-002', userName: 'Siti Rahayu', userEmail: 'siti@gmail.com',
+    eventId: 'evt-2', eventTitle: 'Festival Suara Kota', ticketType: 'Reguler', quantity: 3,
+    totalAmount: 180000, status: 'paid', paymentMethod: 'E-Wallet (GoPay)', createdAt: '2026-08-12T10:00:00Z',
+    ticketIds: ['tkt-003', 'tkt-004', 'tkt-005']
+  },
+  {
+    id: 'trx-003', userId: 'usr-003', userName: 'Ahmad Fauzi', userEmail: 'ahmad@gmail.com',
+    eventId: 'evt-1', eventTitle: 'Harmoni Malam Jazz', ticketType: 'Reguler', quantity: 1,
+    totalAmount: 45000, status: 'pending', paymentMethod: 'Transfer Bank', createdAt: '2026-08-14T16:00:00Z',
+    ticketIds: ['tkt-006']
+  },
+  {
+    id: 'trx-004', userId: 'usr-001', userName: 'Budi Santoso', userEmail: 'budi@gmail.com',
+    eventId: 'evt-3', eventTitle: 'Indie Night Out', ticketType: 'VIP', quantity: 2,
+    totalAmount: 400000, status: 'paid', paymentMethod: 'Kartu Kredit', createdAt: '2026-08-20T09:00:00Z',
+    ticketIds: ['tkt-007', 'tkt-008']
+  },
+  {
+    id: 'trx-005', userId: 'usr-002', userName: 'Siti Rahayu', userEmail: 'siti@gmail.com',
+    eventId: 'evt-4', eventTitle: 'EDM Takeover Bali', ticketType: 'VIP', quantity: 1,
+    totalAmount: 300000, status: 'refunded', paymentMethod: 'E-Wallet (OVO)', createdAt: '2026-08-22T11:00:00Z',
+    ticketIds: ['tkt-009']
   }
 ];
 
-// Seed initial data if not present
-if (!localStorage.getItem('vibepass_events')) {
-  localStorage.setItem('vibepass_events', JSON.stringify(INITIAL_EVENTS));
-}
-if (!localStorage.getItem('vibepass_tickets')) {
-  localStorage.setItem('vibepass_tickets', JSON.stringify([]));
-}
-if (!localStorage.getItem('vibepass_history')) {
-  localStorage.setItem('vibepass_history', JSON.stringify([]));
-}
-if (!localStorage.getItem('vibepass_notifications')) {
-  localStorage.setItem('vibepass_notifications', JSON.stringify(INITIAL_NOTIFICATIONS));
+const seedTickets = [
+  { id: 'tkt-001', transactionId: 'trx-001', userId: 'usr-001', userName: 'Budi Santoso', userEmail: 'budi@gmail.com', eventId: 'evt-1', eventTitle: 'Harmoni Malam Jazz', eventDate: '2026-09-20', venue: 'Balai Sarbini', ticketType: 'VIP', status: 'active', checkedIn: false, qrCode: null, createdAt: '2026-08-10T14:30:00Z' },
+  { id: 'tkt-002', transactionId: 'trx-001', userId: 'usr-001', userName: 'Budi Santoso', userEmail: 'budi@gmail.com', eventId: 'evt-1', eventTitle: 'Harmoni Malam Jazz', eventDate: '2026-09-20', venue: 'Balai Sarbini', ticketType: 'VIP', status: 'active', checkedIn: false, qrCode: null, createdAt: '2026-08-10T14:30:00Z' },
+  { id: 'tkt-003', transactionId: 'trx-002', userId: 'usr-002', userName: 'Siti Rahayu', userEmail: 'siti@gmail.com', eventId: 'evt-2', eventTitle: 'Festival Suara Kota', eventDate: '2026-10-05', venue: 'GBK Senayan', ticketType: 'Reguler', status: 'active', checkedIn: true, qrCode: null, createdAt: '2026-08-12T10:00:00Z' },
+  { id: 'tkt-004', transactionId: 'trx-002', userId: 'usr-002', userName: 'Siti Rahayu', userEmail: 'siti@gmail.com', eventId: 'evt-2', eventTitle: 'Festival Suara Kota', eventDate: '2026-10-05', venue: 'GBK Senayan', ticketType: 'Reguler', status: 'active', checkedIn: false, qrCode: null, createdAt: '2026-08-12T10:00:00Z' },
+  { id: 'tkt-005', transactionId: 'trx-002', userId: 'usr-002', userName: 'Siti Rahayu', userEmail: 'siti@gmail.com', eventId: 'evt-2', eventTitle: 'Festival Suara Kota', eventDate: '2026-10-05', venue: 'GBK Senayan', ticketType: 'Reguler', status: 'active', checkedIn: false, qrCode: null, createdAt: '2026-08-12T10:00:00Z' },
+  { id: 'tkt-006', transactionId: 'trx-003', userId: 'usr-003', userName: 'Ahmad Fauzi', userEmail: 'ahmad@gmail.com', eventId: 'evt-1', eventTitle: 'Harmoni Malam Jazz', eventDate: '2026-09-20', venue: 'Balai Sarbini', ticketType: 'Reguler', status: 'pending', checkedIn: false, qrCode: null, createdAt: '2026-08-14T16:00:00Z' },
+  { id: 'tkt-007', transactionId: 'trx-004', userId: 'usr-001', userName: 'Budi Santoso', userEmail: 'budi@gmail.com', eventId: 'evt-3', eventTitle: 'Indie Night Out', eventDate: '2026-11-12', venue: 'Motion Blue', ticketType: 'VIP', status: 'active', checkedIn: false, qrCode: null, createdAt: '2026-08-20T09:00:00Z' },
+  { id: 'tkt-008', transactionId: 'trx-004', userId: 'usr-001', userName: 'Budi Santoso', userEmail: 'budi@gmail.com', eventId: 'evt-3', eventTitle: 'Indie Night Out', eventDate: '2026-11-12', venue: 'Motion Blue', ticketType: 'VIP', status: 'active', checkedIn: false, qrCode: null, createdAt: '2026-08-20T09:00:00Z' },
+  { id: 'tkt-009', transactionId: 'trx-005', userId: 'usr-002', userName: 'Siti Rahayu', userEmail: 'siti@gmail.com', eventId: 'evt-4', eventTitle: 'EDM Takeover Bali', eventDate: '2026-12-31', venue: 'GWK Cultural Park', ticketType: 'VIP', status: 'cancelled', checkedIn: false, qrCode: null, createdAt: '2026-08-22T11:00:00Z' }
+];
+
+function loadFromStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) { console.error(e); }
+  return seedEvents;
 }
 
-// Simulated Network Latency
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+function saveToStorage(events) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+    window.dispatchEvent(new Event('auralis:data-changed'));
+  } catch (e) { console.error(e); }
+}
+
+function loadList(key, seed = []) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) return JSON.parse(raw);
+  } catch (e) { console.error(e); }
+  return seed;
+}
+
+function saveList(key, list) {
+  try {
+    localStorage.setItem(key, JSON.stringify(list));
+  } catch (e) { console.error(e); }
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function generateId(prefix = 'evt') {
+  return prefix + '-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+}
+
+function createTicketsFromCategories(categories) {
+  return categories.map(category => ({
+    type: category.name.toLowerCase().includes('vip') ? 'vip' : 'regular',
+    name: category.name,
+    price: category.price,
+    benefits: category.name.toLowerCase().includes('vip')
+      ? ['Akses area VIP', 'Merchandise eksklusif']
+      : ['Akses area umum', 'E-ticket QR']
+  }));
+}
+
+(function initSeedData() {
+  if (!localStorage.getItem(USERS_KEY)) saveList(USERS_KEY, seedUsers);
+  if (!localStorage.getItem(TRANSACTIONS_KEY)) saveList(TRANSACTIONS_KEY, seedTransactions);
+  if (!localStorage.getItem(TICKETS_KEY)) saveList(TICKETS_KEY, seedTickets);
+})();
+
+let eventsData = loadFromStorage();
+
+function addAuditLog(action, target, details, actor = 'admin') {
+  const logs = loadList(AUDIT_KEY);
+  logs.unshift({
+    id: generateId('aud'),
+    action,
+    target,
+    details,
+    actor,
+    timestamp: new Date().toISOString()
+  });
+  saveList(AUDIT_KEY, logs);
+}
 
 export const api = {
-  // === EVENTS ===
-  getEvents: async () => {
-    await delay(800); // Simulate network delay
-    const data = localStorage.getItem('vibepass_events');
-    return JSON.parse(data);
+  async getEvents() {
+    await delay(150);
+    return eventsData.filter(e => e.status === 'published');
   },
 
-  getEventById: async (id) => {
-    await delay(800);
-    const data = localStorage.getItem('vibepass_events');
-    const events = JSON.parse(data);
-    const event = events.find(e => e.id === id);
-    if (!event) throw new Error("Event not found");
+  async getFeaturedEvents(limit = 10) {
+    await delay(150);
+    return eventsData.filter(e => e.status === 'published').slice(0, limit);
+  },
+
+  async getEventById(id) {
+    await delay(150);
+    const event = eventsData.find(e => e.id === id);
+    if (!event) throw new Error('Event tidak ditemukan');
     return event;
   },
 
-  // === TICKETS ===
-  getTickets: async () => {
-    await delay(600);
-    const data = localStorage.getItem('vibepass_tickets');
-    return JSON.parse(data);
+  async getAllEventsForOrganizer(organizerId = null) {
+    await delay(100);
+    if (organizerId) return eventsData.filter(e => e.organizerId === organizerId);
+    return [...eventsData];
   },
 
-  // === HISTORY ===
-  getHistory: async () => {
-    await delay(600);
-    const data = localStorage.getItem('vibepass_history');
-    return JSON.parse(data);
+  async getAllEventsForAdmin() {
+    await delay(100);
+    return [...eventsData];
   },
 
-  // === NOTIFICATIONS ===
-  getNotifications: async () => {
-    await delay(400);
-    const data = localStorage.getItem('vibepass_notifications');
-    return JSON.parse(data);
-  },
-
-  markNotificationsRead: async () => {
-    await delay(300);
-    const data = localStorage.getItem('vibepass_notifications');
-    let notifications = JSON.parse(data);
-    notifications = notifications.map(n => ({ ...n, read: true }));
-    localStorage.setItem('vibepass_notifications', JSON.stringify(notifications));
-    return notifications;
-  },
-
-  // === TRANSACTIONS ===
-  purchaseTicket: async (ticket, history, notifications) => {
-    await delay(1500); // Payment processing delay
-
-    // Save ticket
-    const ticketsData = JSON.parse(localStorage.getItem('vibepass_tickets'));
-    ticketsData.unshift(ticket);
-    localStorage.setItem('vibepass_tickets', JSON.stringify(ticketsData));
-
-    // Save history
-    const historyData = JSON.parse(localStorage.getItem('vibepass_history'));
-    historyData.unshift(history);
-    localStorage.setItem('vibepass_history', JSON.stringify(historyData));
-
-    // Save notifications
-    const notifData = JSON.parse(localStorage.getItem('vibepass_notifications'));
-    const formattedNotifs = notifications.map(n => ({
-      ...n,
-      id: `notif-${Date.now()}-${Math.random()}`,
-      date: new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-      read: false
+  async createEvent(eventPayload) {
+    await delay(200);
+    const categories = (eventPayload.categories || []).map(c => ({
+      id: c.id || generateId('cat'),
+      name: c.name, price: Number(c.price) || 0,
+      quota: Number(c.quota) || 0, sold: Number(c.sold) || 0
     }));
-    const updatedNotifs = [...formattedNotifs, ...notifData];
-    localStorage.setItem('vibepass_notifications', JSON.stringify(updatedNotifs));
+    const price = categories.length > 0 ? Math.min(...categories.map(c => c.price)) : 0;
+    const newEvent = {
+      id: generateId('evt'),
+      title: eventPayload.title || '',
+      artist: eventPayload.artist || eventPayload.lineup?.[0] || 'Berbagai Artis',
+      venue: eventPayload.venue || '',
+      city: eventPayload.city || '',
+      date: eventPayload.date || '',
+      time: eventPayload.time || '19:00',
+      category: eventPayload.category || 'Concert',
+      secondaryTag: eventPayload.category || 'Concert',
+      description: eventPayload.description || '',
+      image: eventPayload.image || '',
+      status: 'pending',
+      tag: 'New',
+      address: eventPayload.address || eventPayload.venue || '',
+      lat: Number(eventPayload.lat) || -6.2,
+      lng: Number(eventPayload.lng) || 106.8,
+      doorsOpen: eventPayload.doorsOpen || '18:00',
+      showStarts: eventPayload.showStarts || '19:00',
+      ageLimit: eventPayload.ageLimit || 'Semua umur',
+      lineup: eventPayload.lineup || [],
+      organizerId: eventPayload.organizerId || null,
+      categories, price,
+      tickets: createTicketsFromCategories(categories)
+    };
+    eventsData = [newEvent, ...eventsData];
+    saveToStorage(eventsData);
+    addAuditLog('CREATE_EVENT', newEvent.id, `Event "${newEvent.title}" dibuat`, eventPayload.organizerId || 'organizer');
+    return newEvent;
+  },
 
-    return { success: true };
+  async updateEvent(eventId, updates) {
+    await delay(200);
+    eventsData = eventsData.map(e => e.id === eventId ? { ...e, ...updates } : e);
+    saveToStorage(eventsData);
+    addAuditLog('UPDATE_EVENT', eventId, `Event diperbarui`);
+    return eventsData.find(e => e.id === eventId);
+  },
+
+  async deleteEvent(eventId) {
+    await delay(200);
+    const evt = eventsData.find(e => e.id === eventId);
+    eventsData = eventsData.filter(e => e.id !== eventId);
+    saveToStorage(eventsData);
+    addAuditLog('DELETE_EVENT', eventId, `Event "${evt?.title}" dihapus`);
+    return true;
+  },
+
+  async softDeleteEvent(eventId) {
+    await delay(200);
+    eventsData = eventsData.map(e => e.id === eventId ? { ...e, status: 'deleted', deletedAt: new Date().toISOString() } : e);
+    saveToStorage(eventsData);
+    addAuditLog('SOFT_DELETE_EVENT', eventId, `Event di-soft-delete`);
+    return true;
+  },
+
+  async approveEvent(eventId) {
+    await delay(200);
+    eventsData = eventsData.map(e => e.id === eventId ? { ...e, status: 'published' } : e);
+    saveToStorage(eventsData);
+    addAuditLog('APPROVE_EVENT', eventId, `Event disetujui dan dipublish`);
+    return true;
+  },
+
+  async rejectEvent(eventId) {
+    await delay(200);
+    eventsData = eventsData.map(e => e.id === eventId ? { ...e, status: 'cancelled' } : e);
+    saveToStorage(eventsData);
+    addAuditLog('REJECT_EVENT', eventId, `Event ditolak`);
+    return true;
+  },
+
+  async addTicketCategory(eventId, category) {
+    await delay(150);
+    const newCategory = { id: generateId('cat'), sold: 0, ...category };
+    eventsData = eventsData.map(e => {
+      if (e.id !== eventId) return e;
+      const categories = [...(e.categories || []), newCategory];
+      return { ...e, categories, price: Math.min(...categories.map(c => Number(c.price) || 0)), tickets: createTicketsFromCategories(categories) };
+    });
+    saveToStorage(eventsData);
+    return newCategory;
+  },
+
+  async updateTicketCategory(eventId, categoryId, updates) {
+    await delay(150);
+    eventsData = eventsData.map(e => {
+      if (e.id !== eventId) return e;
+      const categories = (e.categories || []).map(c => c.id === categoryId ? { ...c, ...updates } : c);
+      const price = categories.length > 0 ? Math.min(...categories.map(c => Number(c.price) || 0)) : 0;
+      return { ...e, categories, price, tickets: createTicketsFromCategories(categories) };
+    });
+    saveToStorage(eventsData);
+  },
+
+  async deleteTicketCategory(eventId, categoryId) {
+    await delay(150);
+    eventsData = eventsData.map(e => {
+      if (e.id !== eventId) return e;
+      const categories = (e.categories || []).filter(c => c.id !== categoryId);
+      const price = categories.length > 0 ? Math.min(...categories.map(c => Number(c.price) || 0)) : 0;
+      return { ...e, categories, price, tickets: createTicketsFromCategories(categories) };
+    });
+    saveToStorage(eventsData);
+  },
+
+  async getUsers() {
+    await delay(100);
+    return loadList(USERS_KEY, seedUsers);
+  },
+
+  async getUserById(id) {
+    await delay(100);
+    const users = loadList(USERS_KEY, seedUsers);
+    return users.find(u => u.id === id) || null;
+  },
+
+  async updateUser(userId, updates) {
+    await delay(150);
+    const users = loadList(USERS_KEY, seedUsers);
+    const updated = users.map(u => u.id === userId ? { ...u, ...updates } : u);
+    saveList(USERS_KEY, updated);
+    addAuditLog('UPDATE_USER', userId, `User diperbarui: ${JSON.stringify(updates)}`);
+    return updated.find(u => u.id === userId);
+  },
+
+  async deleteUser(userId) {
+    await delay(150);
+    const users = loadList(USERS_KEY, seedUsers);
+    saveList(USERS_KEY, users.filter(u => u.id !== userId));
+    addAuditLog('DELETE_USER', userId, `User dihapus`);
+    return true;
+  },
+
+  async approveOrganizer(userId) {
+    await delay(150);
+    const users = loadList(USERS_KEY, seedUsers);
+    const updated = users.map(u => u.id === userId ? { ...u, status: 'active', role: 'organizer' } : u);
+    saveList(USERS_KEY, updated);
+    addAuditLog('APPROVE_ORGANIZER', userId, `Organizer disetujui`);
+    return true;
+  },
+
+  async suspendOrganizer(userId) {
+    await delay(150);
+    const users = loadList(USERS_KEY, seedUsers);
+    const updated = users.map(u => u.id === userId ? { ...u, status: 'suspended' } : u);
+    saveList(USERS_KEY, updated);
+    addAuditLog('SUSPEND_ORGANIZER', userId, `Organizer disuspend`);
+    return true;
+  },
+
+  async activateOrganizer(userId) {
+    await delay(150);
+    const users = loadList(USERS_KEY, seedUsers);
+    const updated = users.map(u => u.id === userId ? { ...u, status: 'active' } : u);
+    saveList(USERS_KEY, updated);
+    addAuditLog('ACTIVATE_ORGANIZER', userId, `Organizer diaktifkan`);
+    return true;
+  },
+
+  async getAllTransactions() {
+    await delay(100);
+    return loadList(TRANSACTIONS_KEY, seedTransactions);
+  },
+
+  async getTransactionsByOrganizer(organizerId) {
+    await delay(100);
+    const all = loadList(TRANSACTIONS_KEY, seedTransactions);
+    const orgEventIds = eventsData.filter(e => e.organizerId === organizerId).map(e => e.id);
+    return all.filter(t => orgEventIds.includes(t.eventId));
+  },
+
+  async updateTransaction(txId, updates) {
+    await delay(150);
+    const txs = loadList(TRANSACTIONS_KEY, seedTransactions);
+    const updated = txs.map(t => t.id === txId ? { ...t, ...updates } : t);
+    saveList(TRANSACTIONS_KEY, updated);
+    return updated.find(t => t.id === txId);
+  },
+
+  async cancelTransaction(txId) {
+    await delay(200);
+    const txs = loadList(TRANSACTIONS_KEY, seedTransactions);
+    const updated = txs.map(t => t.id === txId ? { ...t, status: 'cancelled' } : t);
+    saveList(TRANSACTIONS_KEY, updated);
+    const tickets = loadList(TICKETS_KEY, seedTickets);
+    const tx = txs.find(t => t.id === txId);
+    if (tx) {
+      saveList(TICKETS_KEY, tickets.map(tk => tx.ticketIds?.includes(tk.id) ? { ...tk, status: 'cancelled' } : tk));
+    }
+    addAuditLog('CANCEL_TRANSACTION', txId, `Transaksi dibatalkan`);
+    return true;
+  },
+
+  async refundTransaction(txId) {
+    await delay(200);
+    const txs = loadList(TRANSACTIONS_KEY, seedTransactions);
+    const updated = txs.map(t => t.id === txId ? { ...t, status: 'refunded' } : t);
+    saveList(TRANSACTIONS_KEY, updated);
+    addAuditLog('REFUND_TRANSACTION', txId, `Transaksi di-refund`);
+    return true;
+  },
+
+  async confirmPayment(txId) {
+    await delay(200);
+    const txs = loadList(TRANSACTIONS_KEY, seedTransactions);
+    const updated = txs.map(t => t.id === txId ? { ...t, status: 'paid' } : t);
+    saveList(TRANSACTIONS_KEY, updated);
+    const tickets = loadList(TICKETS_KEY, seedTickets);
+    const tx = txs.find(t => t.id === txId);
+    if (tx) {
+      saveList(TICKETS_KEY, tickets.map(tk => tx.ticketIds?.includes(tk.id) ? { ...tk, status: 'active' } : tk));
+    }
+    addAuditLog('CONFIRM_PAYMENT', txId, `Pembayaran dikonfirmasi`);
+    return true;
+  },
+
+  async getAllTickets() {
+    await delay(100);
+    return loadList(TICKETS_KEY, seedTickets);
+  },
+
+  async getTicketsByOrganizer(organizerId) {
+    await delay(100);
+    const all = loadList(TICKETS_KEY, seedTickets);
+    const orgEventIds = eventsData.filter(e => e.organizerId === organizerId).map(e => e.id);
+    return all.filter(t => orgEventIds.includes(t.eventId));
+  },
+
+  async cancelTicket(ticketId) {
+    await delay(150);
+    const tickets = loadList(TICKETS_KEY, seedTickets);
+    saveList(TICKETS_KEY, tickets.map(t => t.id === ticketId ? { ...t, status: 'cancelled' } : t));
+    addAuditLog('CANCEL_TICKET', ticketId, `Tiket dibatalkan`);
+    return true;
+  },
+
+  async checkInTicket(ticketId) {
+    await delay(150);
+    const tickets = loadList(TICKETS_KEY, seedTickets);
+    saveList(TICKETS_KEY, tickets.map(t => t.id === ticketId ? { ...t, checkedIn: true, checkedInAt: new Date().toISOString() } : t));
+    return true;
+  },
+
+  async purchaseTicket(ticketRecord, historyRecord, notificationRecords) {
+    await delay(300);
+    const tickets = loadList(TICKETS_KEY, []);
+    tickets.unshift(ticketRecord);
+    saveList(TICKETS_KEY, tickets);
+
+    const history = loadList(HISTORY_KEY);
+    history.unshift(historyRecord);
+    saveList(HISTORY_KEY, history);
+
+    const txs = loadList(TRANSACTIONS_KEY, []);
+    txs.unshift({
+      id: generateId('trx'),
+      userId: historyRecord.userId || 'guest',
+      userName: historyRecord.userName || 'Penonton',
+      userEmail: historyRecord.userEmail || '',
+      eventId: historyRecord.eventId,
+      eventTitle: historyRecord.eventTitle,
+      ticketType: ticketRecord.ticketType,
+      quantity: ticketRecord.quantity,
+      totalAmount: historyRecord.amount,
+      status: 'paid',
+      paymentMethod: historyRecord.paymentMethod || 'E-Wallet',
+      createdAt: new Date().toISOString(),
+      ticketIds: [ticketRecord.id]
+    });
+    saveList(TRANSACTIONS_KEY, txs);
+
+    const notifications = loadList(NOTIFICATIONS_KEY);
+    const newNotifications = notificationRecords.map(n => ({
+      id: generateId('notif'), read: false, createdAt: new Date().toISOString(), ...n
+    }));
+    saveList(NOTIFICATIONS_KEY, [...newNotifications, ...notifications]);
+
+    eventsData = eventsData.map(event => {
+      const hasCategory = (event.categories || []).some(c => c.name === ticketRecord.ticketType);
+      if (!hasCategory) return event;
+      const categories = event.categories.map(c =>
+        c.name === ticketRecord.ticketType
+          ? { ...c, sold: Number(c.sold || 0) + Number(ticketRecord.quantity || 0) }
+          : c
+      );
+      return { ...event, categories, tickets: createTicketsFromCategories(categories) };
+    });
+    saveToStorage(eventsData);
+    return true;
+  },
+
+  async sendAdminNotification(notif) {
+    await delay(100);
+    const notifs = loadList(ADMIN_NOTIF_KEY);
+    notifs.unshift({ id: generateId('anotif'), createdAt: new Date().toISOString(), ...notif });
+    saveList(ADMIN_NOTIF_KEY, notifs);
+    addAuditLog('SEND_NOTIFICATION', 'platform', `Notifikasi dikirim: "${notif.title}"`);
+    return true;
+  },
+
+  async getAdminNotifications() {
+    await delay(100);
+    return loadList(ADMIN_NOTIF_KEY);
+  },
+
+  async getHistory() { await delay(100); return loadList(HISTORY_KEY); },
+  async getMyTickets() { await delay(100); return loadList(TICKETS_KEY, seedTickets); },
+  async getNotifications() { await delay(100); return loadList(NOTIFICATIONS_KEY); },
+  async getFavorites() { await delay(100); return loadList(FAVORITES_KEY); },
+  async toggleFavorite(event) {
+    await delay(100);
+    const favorites = loadList(FAVORITES_KEY);
+    const exists = favorites.some(f => f.id === event.id);
+    const updated = exists ? favorites.filter(f => f.id !== event.id) : [event, ...favorites];
+    saveList(FAVORITES_KEY, updated);
+    return updated;
+  },
+  async getReviews() { await delay(100); return loadList(REVIEWS_KEY); },
+  async addReview(review) {
+    await delay(150);
+    const reviews = loadList(REVIEWS_KEY);
+    reviews.unshift({ id: generateId('rev'), createdAt: new Date().toISOString(), ...review });
+    saveList(REVIEWS_KEY, reviews);
+    return true;
+  },
+
+  async deleteReview(reviewId) {
+    await delay(150);
+    const reviews = loadList(REVIEWS_KEY);
+    saveList(REVIEWS_KEY, reviews.filter(r => r.id !== reviewId));
+    addAuditLog('DELETE_REVIEW', reviewId, `Review dihapus`);
+    return true;
+  },
+
+  async getAuditLogs() {
+    await delay(100);
+    return loadList(AUDIT_KEY);
+  },
+
+  async getPlatformFee() {
+    await delay(50);
+    const fee = localStorage.getItem(PLATFORM_FEE_KEY);
+    return fee ? Number(fee) : 10;
+  },
+
+  async setPlatformFee(feePercent) {
+    await delay(100);
+    localStorage.setItem(PLATFORM_FEE_KEY, String(feePercent));
+    addAuditLog('SET_PLATFORM_FEE', 'platform', `Platform fee diubah menjadi ${feePercent}%`);
+    return true;
+  },
+
+  async getSettlements() {
+    await delay(100);
+    return loadList(SETTLEMENT_KEY);
+  },
+
+  async createSettlement(settlement) {
+    await delay(200);
+    const list = loadList(SETTLEMENT_KEY);
+    const newSettlement = { id: generateId('stl'), createdAt: new Date().toISOString(), status: 'completed', ...settlement };
+    list.unshift(newSettlement);
+    saveList(SETTLEMENT_KEY, list);
+    addAuditLog('CREATE_SETTLEMENT', newSettlement.id, `Settlement untuk ${settlement.organizerName}: Rp${settlement.amount?.toLocaleString('id-ID')}`);
+    return newSettlement;
+  },
+
+  async getWithdrawals() {
+    await delay(100);
+    return loadList(WITHDRAWAL_KEY);
+  },
+
+  async requestWithdrawal(data) {
+    await delay(200);
+    const list = loadList(WITHDRAWAL_KEY);
+    const newWithdrawal = { id: generateId('wd'), createdAt: new Date().toISOString(), status: 'pending', ...data };
+    list.unshift(newWithdrawal);
+    saveList(WITHDRAWAL_KEY, list);
+    return newWithdrawal;
+  },
+
+  async processWithdrawal(withdrawalId, status) {
+    await delay(200);
+    const list = loadList(WITHDRAWAL_KEY);
+    const updated = list.map(w => w.id === withdrawalId ? { ...w, status, processedAt: new Date().toISOString() } : w);
+    saveList(WITHDRAWAL_KEY, updated);
+    addAuditLog('PROCESS_WITHDRAWAL', withdrawalId, `Withdrawal ${status}`);
+    return true;
+  },
+
+  async sendOrganizerNotification(notif) {
+    await delay(100);
+    const notifications = loadList(NOTIFICATIONS_KEY);
+    const newNotif = { id: generateId('notif'), read: false, createdAt: new Date().toISOString(), type: 'organizer', ...notif };
+    notifications.unshift(newNotif);
+    saveList(NOTIFICATIONS_KEY, notifications);
+    return true;
+  },
+
+  async getPlatformStats() {
+    await delay(100);
+    const users = loadList(USERS_KEY, seedUsers);
+    const txs = loadList(TRANSACTIONS_KEY, seedTransactions);
+    const tickets = loadList(TICKETS_KEY, seedTickets);
+    const events = [...eventsData];
+    const platformFee = localStorage.getItem(PLATFORM_FEE_KEY) ? Number(localStorage.getItem(PLATFORM_FEE_KEY)) : 10;
+    const totalRevenue = txs.filter(t => t.status === 'paid').reduce((s, t) => s + (t.totalAmount || 0), 0);
+    const totalSold = txs.filter(t => t.status === 'paid').reduce((s, t) => s + (t.quantity || 0), 0);
+    const totalRefund = txs.filter(t => t.status === 'refunded').reduce((s, t) => s + (t.totalAmount || 0), 0);
+    const platformRevenue = Math.round(totalRevenue * platformFee / 100);
+    const totalOrganizers = users.filter(u => u.role === 'organizer').length;
+    const totalCheckedIn = tickets.filter(t => t.checkedIn).length;
+
+    const monthlySales = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      const month = d.toLocaleString('id-ID', { month: 'short' });
+      const year = d.getFullYear();
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const sales = txs.filter(t => t.status === 'paid' && t.createdAt?.startsWith(key)).reduce((s, t) => s + (t.quantity || 0), 0);
+      const revenue = txs.filter(t => t.status === 'paid' && t.createdAt?.startsWith(key)).reduce((s, t) => s + (t.totalAmount || 0), 0);
+      monthlySales.push({ month: `${month} ${year}`, sales, revenue });
+    }
+
+    return {
+      totalUsers: users.length,
+      totalOrganizers,
+      totalEvents: events.length,
+      publishedEvents: events.filter(e => e.status === 'published').length,
+      pendingEvents: events.filter(e => e.status === 'pending').length,
+      totalTicketsSold: totalSold,
+      totalRevenue,
+      totalRefund,
+      platformFee,
+      platformRevenue,
+      gmv: totalRevenue,
+      totalTransactions: txs.length,
+      totalCheckedIn,
+      monthlySales,
+      eventSales: events.map(e => {
+        const eventTxs = txs.filter(t => t.eventId === e.id && t.status === 'paid');
+        return { name: e.title, sold: eventTxs.reduce((s, t) => s + (t.quantity || 0), 0), revenue: eventTxs.reduce((s, t) => s + (t.totalAmount || 0), 0) };
+      }).filter(e => e.sold > 0)
+    };
   }
 };

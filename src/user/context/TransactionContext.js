@@ -1,29 +1,26 @@
-import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { api } from '../../api';
 
-const TransactionContext = createContext();
+const TransactionContext = createContext(null);
 
-export const useTransaction = () => useContext(TransactionContext);
-
-export const TransactionProvider = ({ children }) => {
-  const [myTickets, setMyTickets] = useState([]);
+export function TransactionProvider({ children }) {
   const [history, setHistory] = useState([]);
+  const [myTickets, setMyTickets] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const loadData = useCallback(async () => {
     try {
-      setLoading(true);
-      const [ticketsData, historyData, notifData] = await Promise.all([
-        api.getTickets(),
+      const [historyData, ticketsData, notifData] = await Promise.all([
         api.getHistory(),
+        api.getMyTickets(),
         api.getNotifications()
       ]);
-      setMyTickets(ticketsData);
       setHistory(historyData);
+      setMyTickets(ticketsData);
       setNotifications(notifData);
     } catch (error) {
-      console.error("Failed to load transaction data", error);
+      console.error('Gagal memuat data transaksi', error);
     } finally {
       setLoading(false);
     }
@@ -33,18 +30,15 @@ export const TransactionProvider = ({ children }) => {
     loadData();
   }, [loadData]);
 
-  const markAllAsRead = async () => {
-    const updated = await api.markNotificationsRead();
-    setNotifications(updated);
-  };
+  const value = { history, myTickets, notifications, loading, loadData };
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  return <TransactionContext.Provider value={value}>{children}</TransactionContext.Provider>;
+}
 
-  return (
-    <TransactionContext.Provider value={{
-      myTickets, history, notifications, loading, loadData, markAllAsRead, unreadCount
-    }}>
-      {children}
-    </TransactionContext.Provider>
-  );
-};
+export function useTransaction() {
+  const ctx = useContext(TransactionContext);
+  if (!ctx) {
+    throw new Error('useTransaction harus dipakai di dalam TransactionProvider');
+  }
+  return ctx;
+}

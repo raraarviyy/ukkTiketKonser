@@ -1,3 +1,5 @@
+// src/user/explore/app.js
+
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../../components/Sidebar';
@@ -19,19 +21,39 @@ export default function Explore() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
 
-  React.useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        const data = await api.getEvents();
-        setEvents(data);
-      } catch (error) {
-        console.error("Failed to fetch events", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+React.useEffect(() => {
+  const fetchEvents = async () => {
+    try {
+      setLoading(true);
+
+      const data = await api.getEvents();
+
+      setEvents(data);
+    } catch (error) {
+      console.error('Failed to fetch events', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchEvents();
+
+  const handleDataChanged = () => {
     fetchEvents();
-  }, []);
+  };
+
+  window.addEventListener(
+    'auralis:data-changed',
+    handleDataChanged
+  );
+
+  return () => {
+    window.removeEventListener(
+      'auralis:data-changed',
+      handleDataChanged
+    );
+  };
+}, []);
 
   const { toggleFavorite, isFavorite } = useFavorites();
 

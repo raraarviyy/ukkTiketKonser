@@ -14,7 +14,6 @@ export default function EventDetail() {
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // State Opsi Tiket & Jumlah Tiket
   const [selectedTicketType, setSelectedTicketType] = useState('regular');
   const [ticketQuantity, setTicketQuantity] = useState(1);
   const [event, setEvent] = useState(null);
@@ -83,7 +82,6 @@ export default function EventDetail() {
 
   const favorited = isFavorite(event.id);
 
-  // Dapatkan detail tipe tiket yang sedang dipilih
   const currentTicket = event.tickets.find(t => t.type === selectedTicketType) || event.tickets[0];
   const totalPrice = currentTicket.price * ticketQuantity;
 
@@ -98,7 +96,6 @@ export default function EventDetail() {
     });
   };
 
-  // Rute & embed peta dihitung dari titik lokasi asli (lat/lng) venue
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${event.lat},${event.lng}`;
   const bboxOffset = 0.01;
   const mapBbox = `${event.lng - bboxOffset}%2C${event.lat - bboxOffset}%2C${event.lng + bboxOffset}%2C${event.lat + bboxOffset}`;
@@ -114,7 +111,6 @@ export default function EventDetail() {
 
         <main className="detail-main" style={{ flex: 1, overflowY: 'auto' }}>
 
-          {/* Back Button */}
           <button
             onClick={() => navigate(-1)}
             style={{
@@ -125,7 +121,6 @@ export default function EventDetail() {
             <ArrowLeft size={18} /> Kembali
           </button>
 
-          {/* Hero Banner */}
           <div className="detail-hero" style={{
             borderRadius: '24px', overflow: 'hidden', position: 'relative',
             marginBottom: '28px', border: '1px solid #1e2235'
@@ -184,10 +179,8 @@ export default function EventDetail() {
 
           <div className="detail-grid">
 
-            {/* Kolom Kiri: Detail Deskripsi & Lokasi */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
-              {/* Tentang Acara */}
               <div style={{
                 backgroundColor: '#161826', borderRadius: '20px', padding: '24px', border: '1px solid #1e2235'
               }}>
@@ -220,7 +213,6 @@ export default function EventDetail() {
                 </div>
               </div>
 
-              {/* Lokasi Acara & Maps */}
               <div style={{
                 backgroundColor: '#161826', borderRadius: '20px', padding: '24px', border: '1px solid #1e2235'
               }}>
@@ -242,7 +234,6 @@ export default function EventDetail() {
                   </a>
                 </div>
 
-                {/* Peta interaktif OpenStreetMap sesuai titik koordinat venue */}
                 <div style={{
                   borderRadius: '14px', overflow: 'hidden', height: '220px', marginBottom: '16px',
                   border: '1px solid #282c42'
@@ -265,13 +256,11 @@ export default function EventDetail() {
 
             </div>
 
-            {/* Kolom Kanan: Panel Pembelian Tiket & Opsi VIP / Reguler */}
             <div className="ticket-panel" style={{
               backgroundColor: '#161826', borderRadius: '24px', padding: '28px', border: '1px solid #282c42'
             }}>
               <h3 style={{ fontSize: '20px', fontWeight: '800', margin: '0 0 16px 0' }}>Beli Tiket</h3>
 
-              {/* Opsi Pilihan Tipe Tiket */}
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ fontSize: '12px', fontWeight: '700', color: '#9ca3af', display: 'block', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   Pilih Kategori Tiket
@@ -307,7 +296,6 @@ export default function EventDetail() {
                           </span>
                         </div>
 
-                        {/* List Benefit */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px' }}>
                           {t.benefits.map((benefit, idx) => (
                             <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#9ca3af' }}>
@@ -324,7 +312,6 @@ export default function EventDetail() {
 
               <hr style={{ borderColor: '#1e2235', margin: '0 0 20px 0' }} />
 
-              {/* Pengatur Jumlah Tiket */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '10px' }}>
                 <div>
                   <span style={{ fontSize: '14px', fontWeight: '700', display: 'block' }}>Jumlah Tiket</span>
@@ -347,13 +334,11 @@ export default function EventDetail() {
                 </div>
               </div>
 
-              {/* Subtotal */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                 <span style={{ fontSize: '14px', color: '#9ca3af' }}>Total Pembayaran</span>
                 <span style={{ fontSize: '28px', fontWeight: '900', color: '#fff' }}>${totalPrice}</span>
               </div>
 
-              {/* Tombol Checkout */}
               <button
                 onClick={handleCheckout}
                 style={{

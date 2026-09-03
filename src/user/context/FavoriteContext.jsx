@@ -1,35 +1,43 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { api } from '../../api';
 
-const FavoriteContext = createContext();
+const FavoriteContext = createContext(null);
 
 export function FavoriteProvider({ children }) {
   const [favorites, setFavorites] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const toggleFavorite = (event) => {
-    setFavorites((prev) => {
-      const exists = prev.some((item) => item.id === event.id);
-      if (exists) {
-        return prev.filter((item) => item.id !== event.id);
-      } else {
-        return [...prev, event];
-      }
-    });
+  const loadFavorites = useCallback(async () => {
+    try {
+      const data = await api.getFavorites();
+      setFavorites(data);
+    } catch (error) {
+      console.error('Gagal memuat favorit', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadFavorites();
+  }, [loadFavorites]);
+
+  const toggleFavorite = async (event) => {
+    const updated = await api.toggleFavorite(event);
+    setFavorites(updated);
   };
 
-  const isFavorite = (id) => favorites.some((item) => item.id === id);
+  const isFavorite = (eventId) => favorites.some((f) => f.id === eventId);
 
-  return (
-    <FavoriteContext.Provider value={{ favorites, toggleFavorite, isFavorite }}>
-      {children}
-    </FavoriteContext.Provider>
-  );
+  const value = { favorites, loading, toggleFavorite, isFavorite };
+
+  return <FavoriteContext.Provider value={value}>{children}</FavoriteContext.Provider>;
 }
 
-// Custom Hook dengan validasi
 export function useFavorites() {
-  const context = useContext(FavoriteContext);
-  if (!context) {
-    throw new Error("useFavorites harus digunakan di dalam <FavoriteProvider>");
+  const ctx = useContext(FavoriteContext);
+  if (!ctx) {
+    throw new Error('useFavorites harus dipakai di dalam FavoriteProvider');
   }
-  return context;
+  return ctx;
 }
