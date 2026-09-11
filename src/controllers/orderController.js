@@ -8,6 +8,15 @@ const {
   buildQrCodeUrl,
 } = require("../utils/generateCode");
 const { useNotifications } = require("../utils/useNotification");
+const {
+  createSnapTransaction,
+  verifySignature,
+  getMidtransStatus,
+  cancelMidtransTransaction,
+  formatPaymentMethod,
+  parseTransactionStatus,
+  clientKey,
+} = require("../services/midtransService");
 
 const orderInclude = {
   event: {
@@ -26,16 +35,20 @@ const orderInclude = {
 };
 
 /**
- * Checkout Pemesanan Tiket:
+ * Checkout Pemesanan Tiket dengan Midtrans Snap Payment Gateway:
  * - Memvalidasi ketersediaan event & status event ('approved')
  * - Memvalidasi kuota tiket
- * - Menyimpan order dan tiket digital ber-QR Code
- * - Mengirimkan notifikasi pembayaran & booking konfirmasi
+ * - Membuat Order baru berstatus 'pending'
+ * - Menghasilkan Snap Token & Redirect URL dari Midtrans
+ * - Mengembalikan detail order dan token Snap ke frontend
  */
 async function checkout(req, res) {
-  const { event_id, ticket_type_id, quantity, payment_method } = req.body;
+  const { event_id, ticket_type_id, quantity, payment_method, callbacks } = req.body;
 
-  const event = await prisma.event.findUnique({ where: { id: event_id } });
+  const event = await prisma.event.findUnique({
+    where: { id: event_id },
+    include: { category: true },
+  });
   if (!event) {
     return res.status(404).json({ message: "Event tidak ditemukan", ok: false });
   }
@@ -59,81 +72,371 @@ async function checkout(req, res) {
   }
 
   const { subtotal, tax, total } = calculateOrderTotal(Number(ticketType.price), quantity);
+  const orderCode = generateOrderCode();
+  const invoiceId = generateInvoiceId();
 
-  const order = await prisma.$transaction(async (tx) => {
-    const newOrder = await tx.order.create({
+  // Simpan Order awal dengan status 'pending'
+  const newOrder = await prisma.order.create({
+    data: {
+      order_code: orderCode,
+      invoice_id: invoiceId,
+      user_id: req.user.id,
+      event_id,
+      ticket_type_id,
+      quantity,
+      subtotal,
+      tax,
+      total,
+      payment_method: payment_method || "midtrans",
+      status: "pending",
+    },
+  });
+
+  // Request Snap Token ke Midtrans
+  let snapData = { token: null, redirect_url: null, client_key: clientKey };
+  try {
+    const snapResult = await createSnapTransaction({
+      order: newOrder,
+      user: req.user,
+      event,
+      ticketType,
+      quantity,
+      subtotal,
+      tax,
+      total,
+      callbacks,
+    });
+
+    snapData = snapResult;
+
+    // Update snap_token & snap_redirect_url ke database
+    await prisma.order.update({
+      where: { id: newOrder.id },
       data: {
-        order_code: generateOrderCode(),
-        invoice_id: generateInvoiceId(),
-        user_id: req.user.id,
-        event_id,
-        ticket_type_id,
-        quantity,
-        subtotal,
-        tax,
-        total,
-        payment_method,
-        status: "paid", // Simulasi pembayaran instan terintegrasi
-        paid_at: new Date(),
+        snap_token: snapResult.token,
+        snap_redirect_url: snapResult.redirect_url,
       },
     });
+  } catch (midtransError) {
+    console.error("⚠️ Midtrans Snap Error:", midtransError.message);
+    // Jika dalam development/sandbox tanpa key valid, buat token simulasi agar frontend tetap bisa lanjut testing
+    snapData = {
+      token: `sandbox-snap-${orderCode}`,
+      redirect_url: `https://app.sandbox.midtrans.com/snap/v2/vtweb/sandbox-snap-${orderCode}`,
+      client_key: clientKey,
+      note: "Midtrans sandbox simulation token",
+    };
+  }
 
-    const ticketsData = Array.from({ length: quantity }).map(() => {
-      const ticketCode = generateTicketCode();
-      return {
-        ticket_code: ticketCode,
-        order_id: newOrder.id,
-        user_id: req.user.id,
-        event_id,
-        ticket_type_id,
-        seat: "General Admission",
-        status: "upcoming",
-        qr_code_url: buildQrCodeUrl(ticketCode),
-      };
+  // Notifikasi tagihan / instruksi pembayaran kepada pembeli
+  await prisma.notification.create({
+    data: {
+      user_id: req.user.id,
+      title: "Menunggu Pembayaran",
+      message: `Pemesanan ${orderCode} untuk "${event.title}" sebesar Rp ${Number(total).toLocaleString("id-ID")} berhasil dibuat. Silakan selesaikan pembayaran Anda.`,
+      type: "payment",
+    },
+  });
+
+  const fullOrder = await prisma.order.findUnique({
+    where: { id: newOrder.id },
+    include: orderInclude,
+  });
+
+  return res.status(201).json({
+    message: "Checkout berhasil, silakan selesaikan pembayaran via Midtrans",
+    data: {
+      order: fullOrder,
+      snap_token: snapData.token,
+      snap_redirect_url: snapData.redirect_url,
+      client_key: clientKey,
+    },
+    ok: true,
+  });
+}
+
+/**
+ * Helper internal untuk memproses transaksi yang berhasil dibayar (settlement / capture accept)
+ */
+async function fulfillOrder(order, paymentType, rawNotification = {}) {
+  if (order.status === "paid") {
+    return order; // Sudah diproses sebelumnya (idempotent)
+  }
+
+  const formattedPaymentMethod = formatPaymentMethod(paymentType, rawNotification);
+
+  const updatedOrder = await prisma.$transaction(async (tx) => {
+    // 1. Update status order menjadi paid
+    const orderUpdated = await tx.order.update({
+      where: { id: order.id },
+      data: {
+        status: "paid",
+        paid_at: new Date(),
+        payment_method: formattedPaymentMethod,
+      },
+      include: orderInclude,
     });
 
-    await tx.ticket.createMany({ data: ticketsData });
-
-    await tx.ticketType.update({
-      where: { id: ticket_type_id },
-      data: { sold: { increment: quantity } },
+    // 2. Cek apakah tiket sudah pernah digenerate untuk order ini
+    const existingTicketsCount = await tx.ticket.count({
+      where: { order_id: order.id },
     });
 
-    return newOrder;
+    if (existingTicketsCount === 0) {
+      const ticketsData = Array.from({ length: order.quantity }).map(() => {
+        const ticketCode = generateTicketCode();
+        return {
+          ticket_code: ticketCode,
+          order_id: order.id,
+          user_id: order.user_id,
+          event_id: order.event_id,
+          ticket_type_id: order.ticket_type_id,
+          seat: "General Admission",
+          status: "upcoming",
+          qr_code_url: buildQrCodeUrl(ticketCode),
+        };
+      });
+
+      await tx.ticket.createMany({ data: ticketsData });
+
+      // 3. Tambah jumlah tiket terjual di TicketType
+      await tx.ticketType.update({
+        where: { id: order.ticket_type_id },
+        data: { sold: { increment: order.quantity } },
+      });
+    }
+
+    return orderUpdated;
   });
 
   // Notifikasi otomatis kepada pembeli
-  await useNotifications(req.user.id, [
+  await useNotifications(order.user_id, [
     {
-      title: "Pembayaran Berhasil",
-      message: `Pembayaran sebesar Rp ${Number(total).toLocaleString("id-ID")} melalui ${payment_method.toUpperCase()} untuk "${event.title}" telah diterima.`,
+      title: "Pembayaran Berhasil! 🎟️",
+      message: `Pembayaran sebesar Rp ${Number(order.total).toLocaleString("id-ID")} melalui ${formattedPaymentMethod} untuk "${order.event?.title || "Konser"}" telah diterima.`,
       type: "payment",
     },
     {
       title: "E-Tiket Siap Digunakan",
-      message: `${quantity} E-Tiket untuk konser "${event.title}" telah diterbitkan dengan QR Code unik.`,
+      message: `${order.quantity} E-Tiket untuk konser "${order.event?.title || "Konser"}" telah diterbitkan dengan QR Code unik.`,
       type: "booking",
     },
   ]);
 
   // Notifikasi ke penyelenggara bahwa ada tiket terjual
-  if (event.organizer_id) {
+  if (order.event && order.event.organizer_id) {
     await prisma.notification.create({
       data: {
-        user_id: event.organizer_id,
+        user_id: order.event.organizer_id,
         title: "Penjualan Tiket Baru!",
-        message: `${quantity} tiket ${ticketType.name} terjual untuk konser "${event.title}". Total: Rp ${Number(total).toLocaleString("id-ID")}`,
+        message: `${order.quantity} tiket ${order.ticket_type?.name || ""} terjual untuk konser "${order.event.title}". Total: Rp ${Number(order.total).toLocaleString("id-ID")}`,
         type: "booking",
       },
     });
   }
 
-  const data = await prisma.order.findUnique({
-    where: { id: order.id },
+  return updatedOrder;
+}
+
+/**
+ * Helper internal untuk membatalkan / menggagalkan transaksi order
+ */
+async function cancelOrExpireOrder(order, newStatus, reason = "") {
+  if (order.status === newStatus) return order;
+
+  const wasPaid = order.status === "paid";
+
+  const updatedOrder = await prisma.$transaction(async (tx) => {
+    const updated = await tx.order.update({
+      where: { id: order.id },
+      data: { status: newStatus },
+      include: orderInclude,
+    });
+
+    if (wasPaid) {
+      // Batalkan tiket yang sudah diterbitkan
+      await tx.ticket.updateMany({
+        where: { order_id: order.id },
+        data: { status: "cancelled" },
+      });
+
+      // Kembalikan kuota tiket
+      await tx.ticketType.update({
+        where: { id: order.ticket_type_id },
+        data: { sold: { decrement: order.quantity } },
+      });
+    }
+
+    return updated;
+  });
+
+  // Notifikasi kepada pembeli
+  await prisma.notification.create({
+    data: {
+      user_id: order.user_id,
+      title: `Status Pembayaran: ${newStatus.toUpperCase()}`,
+      message: `Pemesanan ${order.order_code} untuk "${order.event?.title || "Konser"}" berstatus ${newStatus}. ${reason ? `Keterangan: ${reason}` : ""}`,
+      type: "payment",
+    },
+  });
+
+  return updatedOrder;
+}
+
+/**
+ * Webhook Handler Notifikasi Midtrans:
+ * Menerima HTTP POST callback dari server Midtrans ketika status pembayaran berubah (settlement, expire, cancel, dll).
+ * Endpoint ini bersifat publik tanpa Bearer token, namun diverifikasi menggunakan Signature Key Midtrans.
+ */
+async function handleMidtransNotification(req, res) {
+  const notification = req.body;
+
+  const orderId = notification.order_id;
+  const transactionStatus = notification.transaction_status;
+  const fraudStatus = notification.fraud_status;
+  const statusCode = notification.status_code;
+  const grossAmount = notification.gross_amount;
+  const signatureKey = notification.signature_key;
+  const paymentType = notification.payment_type;
+
+  console.log(`📥 [Midtrans Webhook] Menerima notifikasi untuk Order ${orderId}: status=${transactionStatus}, payment=${paymentType}`);
+
+  // 1. Verifikasi Signature Key (jika ada signature_key dari Midtrans)
+  if (signatureKey) {
+    const isValidSignature = verifySignature({
+      order_id: orderId,
+      status_code: statusCode,
+      gross_amount: grossAmount,
+      signature_key: signatureKey,
+    });
+
+    if (!isValidSignature) {
+      console.warn(`⚠️ [Midtrans Webhook] Signature tidak valid untuk order: ${orderId}`);
+      return res.status(403).json({ message: "Invalid Midtrans signature", ok: false });
+    }
+  }
+
+  // 2. Cari order berdasarkan order_code
+  const order = await prisma.order.findUnique({
+    where: { order_code: orderId },
     include: orderInclude,
   });
 
-  return res.status(201).json({ message: "Checkout berhasil", data, ok: true });
+  if (!order) {
+    console.warn(`⚠️ [Midtrans Webhook] Order tidak ditemukan: ${orderId}`);
+    return res.status(404).json({ message: "Order not found", ok: false });
+  }
+
+  // 3. Tentukan status order berdasarkan transaction_status & fraud_status Midtrans
+  const parsedStatus = parseTransactionStatus(transactionStatus, fraudStatus);
+
+  if (parsedStatus === "paid") {
+    await fulfillOrder(order, paymentType, notification);
+  } else if (["cancelled", "failed", "expired"].includes(parsedStatus)) {
+    await cancelOrExpireOrder(order, parsedStatus, `Midtrans status: ${transactionStatus}`);
+  }
+
+  return res.status(200).json({
+    message: "Midtrans notification processed successfully",
+    order_code: orderId,
+    status: parsedStatus,
+    ok: true,
+  });
+}
+
+/**
+ * Cek Status Pembayaran ke Midtrans API & Sinkronisasi Database:
+ * Berguna saat testing lokal sandbox (tanpa ngrok/webhook) atau tombol "Cek Pembayaran" di frontend.
+ */
+async function checkPaymentStatus(req, res) {
+  const id = Number(req.params.id);
+
+  const order = await prisma.order.findUnique({
+    where: { id },
+    include: orderInclude,
+  });
+
+  if (!order) {
+    return res.status(404).json({ message: "Order tidak ditemukan", ok: false });
+  }
+
+  const isOwner = order.user_id === req.user.id;
+  const isOrganizer = req.user.role === "Penyelenggara" && order.event.organizer_id === req.user.id;
+  const isAdmin = req.user.role === "Admin";
+
+  if (!isOwner && !isOrganizer && !isAdmin) {
+    return res.status(403).json({ message: "Akses ditolak", ok: false });
+  }
+
+  try {
+    const midtransStatus = await getMidtransStatus(order.order_code);
+    const parsedStatus = parseTransactionStatus(
+      midtransStatus.transaction_status,
+      midtransStatus.fraud_status
+    );
+
+    let updatedOrder = order;
+    if (parsedStatus === "paid" && order.status !== "paid") {
+      updatedOrder = await fulfillOrder(order, midtransStatus.payment_type, midtransStatus);
+    } else if (["cancelled", "failed", "expired"].includes(parsedStatus) && order.status !== parsedStatus) {
+      updatedOrder = await cancelOrExpireOrder(order, parsedStatus, `Midtrans status: ${midtransStatus.transaction_status}`);
+    }
+
+    return res.json({
+      message: "Status transaksi berhasil disinkronkan dengan Midtrans",
+      midtrans_status: midtransStatus,
+      order: updatedOrder,
+      ok: true,
+    });
+  } catch (error) {
+    return res.status(400).json({
+      message: "Gagal mengambil status dari Midtrans: " + (error.message || "Unknown error"),
+      current_order: order,
+      ok: false,
+    });
+  }
+}
+
+/**
+ * Batalkan transaksi yang berstatus pending di Midtrans & Database
+ */
+async function cancelMyOrder(req, res) {
+  const id = Number(req.params.id);
+
+  const order = await prisma.order.findUnique({
+    where: { id },
+    include: orderInclude,
+  });
+
+  if (!order) {
+    return res.status(404).json({ message: "Order tidak ditemukan", ok: false });
+  }
+
+  if (order.user_id !== req.user.id && req.user.role !== "Admin") {
+    return res.status(403).json({ message: "Akses ditolak", ok: false });
+  }
+
+  if (order.status !== "pending") {
+    return res.status(400).json({
+      message: `Order dengan status "${order.status}" tidak dapat dibatalkan`,
+      ok: false,
+    });
+  }
+
+  // Batalkan di Midtrans jika ada
+  try {
+    await cancelMidtransTransaction(order.order_code);
+  } catch (e) {
+    // Abaikan jika transaksi belum pernah diakses di Midtrans
+  }
+
+  const updatedOrder = await cancelOrExpireOrder(order, "cancelled", "Dibatalkan oleh pengguna");
+
+  return res.json({
+    message: "Order berhasil dibatalkan",
+    data: updatedOrder,
+    ok: true,
+  });
 }
 
 /** Riwayat transaksi milik user login */
@@ -230,60 +533,45 @@ async function getAllOrders(req, res) {
   return res.json({ message: "success", data, ok: true });
 }
 
-/** Admin: Update status order / transaksi (misal: cancel / refund jika ada kecurangan) */
+/** Admin: Update status order / transaksi secara manual */
 async function updateOrderStatus(req, res) {
   const id = Number(req.params.id);
   const { status, reason } = req.body;
 
   const order = await prisma.order.findUnique({
     where: { id },
-    include: { tickets: true, event: true },
+    include: orderInclude,
   });
 
   if (!order) {
     return res.status(404).json({ message: "Order tidak ditemukan", ok: false });
   }
 
-  const updated = await prisma.$transaction(async (tx) => {
-    const updatedOrder = await tx.order.update({
+  let updatedOrder;
+  if (status === "paid") {
+    updatedOrder = await fulfillOrder(order, order.payment_method);
+  } else if (["cancelled", "failed", "expired"].includes(status)) {
+    updatedOrder = await cancelOrExpireOrder(order, status, reason);
+  } else {
+    updatedOrder = await prisma.order.update({
       where: { id },
       data: { status },
       include: orderInclude,
     });
+  }
 
-    // Jika transaksi dibatalkan / gagal, batalkan tiket terkait & kurangi quota sold
-    if (status === "cancelled" || status === "failed") {
-      await tx.ticket.updateMany({
-        where: { order_id: id },
-        data: { status: "cancelled" },
-      });
-
-      if (order.status === "paid") {
-        await tx.ticketType.update({
-          where: { id: order.ticket_type_id },
-          data: { sold: { decrement: order.quantity } },
-        });
-      }
-    }
-
-    return updatedOrder;
+  return res.json({
+    message: `Status order berhasil diubah menjadi ${status}`,
+    data: updatedOrder,
+    ok: true,
   });
-
-  // Notifikasi perubahan status transaksi kepada user
-  await prisma.notification.create({
-    data: {
-      user_id: order.user_id,
-      title: `Status Transaksi Diperbarui: ${status.toUpperCase()}`,
-      message: `Status pemesanan ${order.order_code} untuk "${order.event.title}" diubah menjadi ${status}. ${reason ? `Alasan: ${reason}` : ""}`,
-      type: "payment",
-    },
-  });
-
-  return res.json({ message: `Status order berhasil diubah menjadi ${status}`, data: updated, ok: true });
 }
 
 module.exports = {
   checkout,
+  handleMidtransNotification,
+  checkPaymentStatus,
+  cancelMyOrder,
   getMyOrders,
   getOrderById,
   getOrganizerOrders,

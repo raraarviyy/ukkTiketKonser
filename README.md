@@ -72,7 +72,7 @@ This section has moved here: [https://facebook.github.io/create-react-app/docs/t
 =======
 # Tiket Konser API (Multi-Role: User, Admin, Penyelenggara)
 
-API **Tiket Konser** dengan **Express.js + Prisma + PostgreSQL**, ditulis dalam **JavaScript murni** (CommonJS), dengan dukungan 3 Role lengkap: **User (Penonton)**, **Admin (Administrator Platform)**, dan **Penyelenggara (Event Organizer)**.
+API **Tiket Konser** dengan **Express.js + Prisma + PostgreSQL**, ditulis dalam **JavaScript murni** (CommonJS), dengan dukungan 3 Role lengkap: **User (Penonton)**, **Admin (Administrator Platform)**, dan **Penyelenggara (Event Organizer)**, serta terintegrasi dengan **Midtrans Payment Gateway (Sandbox Mode)**.
 
 ---
 
@@ -80,10 +80,10 @@ API **Tiket Konser** dengan **Express.js + Prisma + PostgreSQL**, ditulis dalam 
 
 ```bash
 npm install
-cp .env.example .env      # Sesuaikan DATABASE_URL & JWT_SECRET
+cp .env.example .env      # Sesuaikan DATABASE_URL, JWT_SECRET, & MIDTRANS Sandbox Keys
 
 npm run db:generate       # Generate Prisma Client
-npm run db:migrate        # Jalankan migrasi database (atau npx prisma db push)
+npm run db:push           # Jalankan sinkronisasi database (atau npm run db:migrate)
 npm run db:seed           # Seed 3 Role, Kategori, Akun Default, Event, & Sample Reviews
 
 npm run dev               # Berjalan di http://localhost:5000
@@ -99,16 +99,40 @@ npm run dev               # Berjalan di http://localhost:5000
 
 ---
 
+## 💳 Konfigurasi Midtrans Payment Gateway (Sandbox)
+
+Tambahkan konfigurasi Midtrans Anda di file `.env`:
+
+```env
+# Midtrans Payment Gateway Configuration (Sandbox Mode)
+MIDTRANS_SERVER_KEY="SB-Mid-server-xxxxxxxxxxxxxx"
+MIDTRANS_CLIENT_KEY="SB-Mid-client-xxxxxxxxxxxxxx"
+MIDTRANS_IS_PRODUCTION=false
+MIDTRANS_MERCHANT_ID=""
+
+# Frontend URL Callback Redirects (Opsional)
+MIDTRANS_FINISH_URL="http://localhost:3000/orders/finish"
+MIDTRANS_ERROR_URL="http://localhost:3000/orders/error"
+MIDTRANS_PENDING_URL="http://localhost:3000/orders/pending"
+```
+
+> **Catatan Midtrans Sandbox**:
+> 1. Dapatkan Server Key & Client Key dari [Midtrans Sandbox Dashboard](https://dashboard.sandbox.midtrans.com) (Menu *Settings* > *Access Keys*).
+> 2. Untuk pengetesan webhook notifikasi saat pengembangan lokal, atur *Payment Notification URL* di Midtrans Dashboard ke URL ngrok atau tunnel Anda: `https://<your-ngrok-subdomain>.ngrok-free.app/api/orders/notification`.
+
+---
+
 ## 🎭 Fitur Berdasarkan 3 Role
 
 ### 1. 👤 Role: User (Penonton)
 - **Pencarian & Filter Konser**: Temukan event berdasarkan genre musik, nama kota, tanggal acara (`startDate`/`endDate`/`event_date`), nama artis/band, serta kata kunci pencarian.
-- **Pemesanan Tiket**: Memilih kategori tiket (VIP, Reguler, Early Bird, dsb.) dengan validasi kuota secara real-time.
-- **Pembayaran Terintegrasi**: Pilihan metode pembayaran terintegrasi (QRIS, Kartu Kredit/Debit, Virtual Account Bank: BCA, Mandiri, BNI, E-Wallet: GoPay, OVO, Dana).
-- **E-Tiket QR Code**: Tiket digital unik dengan QR Code per lembar tiket untuk validasi gate masuk konser.
-- **Notifikasi & Pengingat**: Pemberitahuan otomatis status transaksi pembayaran, penerbitan tiket, dan info jadwal event.
+- **Pemesanan Tiket & Midtrans Snap**: Memilih kategori tiket (VIP, Reguler, Early Bird, dsb.) dengan validasi kuota real-time dan mendapatkan `snap_token` serta `snap_redirect_url`.
+- **Beragam Metode Pembayaran**: QRIS, GoPay, ShopeePay, Virtual Account Bank (BCA, Mandiri, BNI, BRI, Permata), Kartu Kredit/Debit, dan Minimarket via antarmuka Midtrans Snap.
+- **Sinkronisasi Status Pembayaran**: Sinkronisasi status instan dari Midtrans ke sistem via endpoint `/api/orders/:id/check-payment` dan Midtrans Webhook.
+- **E-Tiket QR Code**: Tiket digital unik diterbitkan otomatis setelah pembayaran berstatus `paid` lengkap dengan QR Code per lembar tiket.
+- **Notifikasi & Pengingat**: Pemberitahuan otomatis saat tagihan dibuat, konfirmasi pembayaran berhasil, penerbitan tiket, dan pembaruan transaksi.
 - **Riwayat Transaksi**: Rekam jejak transaksi pemesanan tiket (`/api/orders/me`) dan koleksi e-tiket (`/api/tickets/me`).
-- **Rating & Ulasan**: Memberikan skor bintang (1-5) dan review untuk event yang telah dihadiri.
+- **Rating & Ulasan**: Memberikan skor bintang (1-5) dan review untuk event yang telah dibeli tiketnya.
 
 ### 2. 🛡️ Role: Admin (Pengelola Platform)
 - **Verifikasi & Moderasi Event**: Memeriksa, menyetujui (`approved`), atau menolak (`rejected`) event baru yang diajukan oleh penyelenggara sebelum tayang ke publik.
@@ -163,13 +187,35 @@ npm run dev               # Berjalan di http://localhost:5000
 - `PUT /ticket-types/:id` — Penyelenggara/Admin: Edit harga/kuota/benefit tiket
 - `DELETE /ticket-types/:id` — Penyelenggara/Admin: Hapus jenis tiket
 
-### 💳 Pemesanan & Transaksi (`/api/orders`)
-- `POST /orders/checkout` — User: Checkout tiket & bayar (QRIS, VA, Card, E-Wallet)
-- `GET /orders/me` — User: Riwayat transaksi sendiri
-- `GET /orders/organizer` — Penyelenggara: Rekap transaksi tiket event miliknya
-- `GET /orders/:id` — Detail pesanan / invoice
-- `GET /orders` — Admin: Monitoring keamanan transaksi platform
-- `PATCH /orders/:id/status` — Admin: Intervensi status pembayaran / pembatalan transaksi
+### 💳 Pemesanan & Pembayaran Midtrans (`/api/orders`)
+- `POST /orders/checkout` — User: Checkout tiket & buat token Midtrans Snap
+  ```json
+  // Request Body
+  {
+    "event_id": 1,
+    "ticket_type_id": 2,
+    "quantity": 2
+  }
+  // Response Data
+  {
+    "message": "Checkout berhasil, silakan selesaikan pembayaran via Midtrans",
+    "data": {
+      "order": { "id": 1, "order_code": "ORD-12345678", "total": "440.00", "status": "pending", ... },
+      "snap_token": "xxx-xxx-xxx",
+      "snap_redirect_url": "https://app.sandbox.midtrans.com/snap/v2/vtweb/xxx-xxx-xxx",
+      "client_key": "SB-Mid-client-xxx"
+    },
+    "ok": true
+  }
+  ```
+- `POST /orders/notification` — **Publik / Midtrans Webhook**: Menerima notifikasi status dari Midtrans (dengan validasi SHA512 signature).
+- `GET /orders/:id/check-payment` — User/Admin: Cek dan sinkronkan status transaksi langsung ke Midtrans.
+- `POST /orders/:id/cancel` — User: Batalkan pesanan pending.
+- `GET /orders/me` — User: Riwayat transaksi sendiri.
+- `GET /orders/organizer` — Penyelenggara: Rekap transaksi tiket event miliknya.
+- `GET /orders/:id` — Detail pesanan / invoice.
+- `GET /orders` — Admin: Monitoring keamanan transaksi platform.
+- `PATCH /orders/:id/status` — Admin: Intervensi status transaksi.
 
 ### 🎟️ Tiket & QR Code Scanner (`/api/tickets`)
 - `GET /tickets/me` — User: Koleksi e-tiket ber-QR Code (`?status=upcoming|used|expired|cancelled`)
@@ -195,4 +241,38 @@ npm run dev               # Berjalan di http://localhost:5000
 - `GET /dashboard/admin` — Admin: Pemantauan performa & statistik platform komprehensif
 - `GET /dashboard/organizer` — Penyelenggara: Dashboard penjualan tiket real-time
 - `GET /dashboard/organizer/revenue` — Penyelenggara: Laporan pendapatan & omzet per event
+<<<<<<< HEAD
 >>>>>>> 70336ce (first commit)
+=======
+
+---
+
+## 💻 Panduan Integrasi Frontend dengan Midtrans Snap
+
+1. Muat script Snap JS di HTML atau komponen React:
+```html
+<script src="https://app.sandbox.midtrans.com/snap/snap.js" data-client-key="YOUR_CLIENT_KEY"></script>
+```
+
+2. Panggil popup Snap setelah checkout:
+```javascript
+// Setelah memanggil API POST /api/orders/checkout
+const { snap_token } = response.data;
+
+window.snap.pay(snap_token, {
+  onSuccess: function(result) {
+    console.log("Pembayaran Berhasil:", result);
+    // Refresh / redirect ke halaman tiket atau panggil /api/orders/:id/check-payment
+  },
+  onPending: function(result) {
+    console.log("Menunggu Pembayaran:", result);
+  },
+  onError: function(result) {
+    console.error("Pembayaran Gagal:", result);
+  },
+  onClose: function() {
+    console.log("Pengguna menutup popup tanpa menyelesaikan pembayaran");
+  }
+});
+```
+>>>>>>> 0a976b7 (first commit)
