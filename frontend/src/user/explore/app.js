@@ -1,5 +1,3 @@
-// src/user/explore/app.js
-
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../../components/Sidebar';
@@ -11,6 +9,26 @@ import FilterModal from '../../components/FilterModal';
 
 const DEFAULT_FILTERS = { genres: [], city: '', maxPrice: 300 };
 
+function normalizeEvent(ev) {
+  const ticketTypes = ev.ticket_types || [];
+  const minPrice = ticketTypes.length > 0
+    ? Math.min(...ticketTypes.map((t) => Number(t.price)))
+    : 0;
+  return {
+    ...ev,
+    date: ev.event_date
+      ? new Date(ev.event_date).toLocaleDateString('id-ID', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        })
+      : '-',
+    price: minPrice,
+    category: ev.category?.name || '',
+    city: ev.city || '',
+  };
+}
+
 export default function Explore() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('explore');
@@ -21,39 +39,39 @@ export default function Explore() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
 
-React.useEffect(() => {
-  const fetchEvents = async () => {
-    try {
-      setLoading(true);
+  React.useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        setLoading(true);
 
-      const data = await api.getEvents();
+        const data = await api.getEvents();
 
-      setEvents(data);
-    } catch (error) {
-      console.error('Failed to fetch events', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+        setEvents(data.map(normalizeEvent));
+      } catch (error) {
+        console.error('Failed to fetch events', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  fetchEvents();
-
-  const handleDataChanged = () => {
     fetchEvents();
-  };
 
-  window.addEventListener(
-    'auralis:data-changed',
-    handleDataChanged
-  );
+    const handleDataChanged = () => {
+      fetchEvents();
+    };
 
-  return () => {
-    window.removeEventListener(
+    window.addEventListener(
       'auralis:data-changed',
       handleDataChanged
     );
-  };
-}, []);
+
+    return () => {
+      window.removeEventListener(
+        'auralis:data-changed',
+        handleDataChanged
+      );
+    };
+  }, []);
 
   const { toggleFavorite, isFavorite } = useFavorites();
 
@@ -62,9 +80,9 @@ React.useEffect(() => {
   const filteredEvents = useMemo(() => {
     return events.filter((event) => {
       const matchesSearch =
-        event.title.toLowerCase().includes(search.toLowerCase()) ||
-        event.artist.toLowerCase().includes(search.toLowerCase()) ||
-        event.venue.toLowerCase().includes(search.toLowerCase());
+        (event.title || '').toLowerCase().includes(search.toLowerCase()) ||
+        (event.artist || '').toLowerCase().includes(search.toLowerCase()) ||
+        (event.venue || '').toLowerCase().includes(search.toLowerCase());
 
       const matchesGenre = filters.genres.length === 0 || filters.genres.includes(event.category);
       const matchesCity = filters.city === '' || event.city === filters.city;
@@ -111,7 +129,6 @@ React.useEffect(() => {
         <div className="explore-content">
           <h1 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '20px' }}>Explore Events</h1>
 
-          {/* Search Bar */}
           <div className="explore-toolbar">
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', backgroundColor: '#161826', borderRadius: '12px', padding: '0 16px', border: '1px solid #1e2235' }}>
               <Search size={18} color="#9ca3af" />
@@ -138,7 +155,6 @@ React.useEffect(() => {
             </button>
           </div>
 
-          {/* Event Grid */}
           {loading ? (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '300px', flexDirection: 'column', gap: '12px' }}>
               <Loader2 size={36} color="#38bdf8" style={{ animation: 'spin 1s linear infinite' }} />
@@ -170,12 +186,11 @@ React.useEffect(() => {
                     <div style={{ position: 'relative' }}>
                       <img src={event.image} alt={event.title} style={{ width: '100%', height: '160px', objectFit: 'cover' }} />
 
-                      {/* Tombol Heart */}
                       <button
                         type="button"
-                        onClick={(e) => {
+                        onClick={async (e) => {
                           e.stopPropagation();
-                          toggleFavorite(event);
+                          await toggleFavorite(event.id);
                         }}
                         style={{
                           position: 'absolute', top: '10px', right: '10px',
@@ -195,7 +210,7 @@ React.useEffect(() => {
                         <MapPin size={14} /> {event.venue}
                       </p>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '16px', fontWeight: '800' }}>${event.price}</span>
+                        <span style={{ fontSize: '16px', fontWeight: '800' }}>Rp{event.price.toLocaleString('id-ID')}</span>
                         <span style={{ color: '#38bdf8', fontSize: '12px', fontWeight: '600' }}>{event.date}</span>
                       </div>
                     </div>

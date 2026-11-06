@@ -1,153 +1,174 @@
-// src/organizer/events/EventForm.jsx
-
-import React, { useState, useEffect, useRef } from 'react';
-import { X, Plus, Trash2, Loader2, MapPin, Calendar, Clock, Sparkles, Ticket, Shield } from 'lucide-react';
-
-const sectionTitleStyle = {
-  fontSize: '0.95rem',
-  fontWeight: '800',
-  color: '#ec4899',
-  display: 'flex',
-  alignItems: 'center',
-  gap: '8px',
-  marginBottom: '14px',
-  textTransform: 'uppercase',
-  letterSpacing: '0.5px'
-};
-
-const cardSectionStyle = {
-  backgroundColor: '#11131f',
-  borderRadius: '16px',
-  padding: '20px',
-  border: '1px solid #1e2235',
-  marginBottom: '20px'
-};
+import React, { useState, useEffect, useRef } from "react";
+import {
+  X,
+  Plus,
+  Trash2,
+  Loader2,
+  MapPin,
+  Calendar,
+  Sparkles,
+  Ticket,
+  Search,
+} from "lucide-react";
+import { THEME } from "../../theme";
 
 const inputStyle = {
-  width: '100%',
-  padding: '12px 16px',
-  borderRadius: '12px',
-  backgroundColor: '#1a1d2e',
-  border: '1px solid #282c42',
-  color: '#fff',
-  fontSize: '0.88rem',
-  outline: 'none',
-  transition: 'border-color 0.2s, box-shadow 0.2s',
-  boxSizing: 'border-box'
+  width: "100%",
+  padding: "12px 16px",
+  borderRadius: 12,
+  backgroundColor: THEME.surfaceAlt,
+  border: `1px solid ${THEME.borderStrong}`,
+  color: THEME.text,
+  fontSize: "0.88rem",
+  outline: "none",
+  boxSizing: "border-box",
+  fontFamily: "inherit",
 };
 
 const labelStyle = {
-  fontSize: '0.82rem',
-  fontWeight: '600',
-  color: '#9ca3af',
-  display: 'block',
-  marginBottom: '6px'
+  fontSize: "0.82rem",
+  fontWeight: 600,
+  color: THEME.muted,
+  display: "block",
+  marginBottom: 6,
+};
+
+const cardSectionStyle = {
+  backgroundColor: THEME.bg,
+  borderRadius: 16,
+  padding: 20,
+  border: `1px solid ${THEME.border}`,
+  marginBottom: 20,
+};
+
+const sectionTitleStyle = {
+  fontSize: "0.95rem",
+  fontWeight: 800,
+  color: THEME.pink,
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  marginBottom: 14,
+  textTransform: "uppercase",
+  letterSpacing: "0.5px",
 };
 
 export default function EventForm({
   initialData,
   onSubmit,
   onClose,
-  submitting
+  submitting,
 }) {
   const [form, setForm] = useState({
-    title: initialData?.title || '',
-    artist: initialData?.artist || '',
-    venue: initialData?.venue || '',
-    city: initialData?.city || '',
-    date: initialData?.date || '',
-    time: initialData?.time || '19:00',
-    description: initialData?.description || '',
-    image: initialData?.image || '',
-    status: initialData?.status || 'published',
-    category: initialData?.category || 'Concert',
-    address: initialData?.address || '',
-    doorsOpen: initialData?.doorsOpen || '18:00',
-    showStarts: initialData?.showStarts || '19:00',
-    ageLimit: initialData?.ageLimit || 'Semua umur',
+    title: initialData?.title || "",
+    artist: initialData?.artist || "",
+    venue: initialData?.venue || "",
+    city: initialData?.city || "",
+    address: initialData?.address || "",
+    date: initialData?.date ? initialData.date.split("T")[0] : "",
+    time: initialData?.time || "19:00",
+    description: initialData?.description || "",
+    image: initialData?.image || "",
+    status: initialData?.status || "published",
+    category: initialData?.category || "Concert",
+    doorsOpen: initialData?.doorsOpen || "18:00",
+    showStarts: initialData?.showStarts || "19:00",
+    ageLimit: initialData?.ageLimit || "Semua umur",
     lat: initialData?.lat || -6.2,
-    lng: initialData?.lng || 106.8
+    lng: initialData?.lng || 106.8,
   });
-
-  const [lineup, setLineup] = useState(
-    initialData?.lineup?.length
-      ? initialData.lineup
-      : ['']
-  );
 
   const [categories, setCategories] = useState(
     initialData?.categories?.length
-      ? initialData.categories.map(category => ({
-          id: category.id,
-          name: category.name || '',
-          price: category.price ?? '',
-          quota: category.quota ?? ''
+      ? initialData.categories.map((c) => ({
+          id: c.id,
+          name: c.name || "",
+          price: c.price ?? "",
+          quota: c.quota ?? "",
         }))
-      : [
-          {
-            name: 'Reguler',
-            price: '',
-            quota: ''
-          }
-        ]
+      : [{ name: "Reguler", price: "", quota: "" }]
   );
 
+  const [isFetchingAddress, setIsFetchingAddress] = useState(false);
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
 
   const updateForm = (field, value) => {
-    setForm(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  // Initialize Leaflet Map
+  // Fungsi untuk mengambil nama kota dan alamat dari koordinat (Reverse Geocoding)
+  const fetchAddressFromCoords = async (lat, lng) => {
+    try {
+      setIsFetchingAddress(true);
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+      const data = await res.json();
+      
+      if (data && data.address) {
+        // Ambil kota (kabupaten/kota)
+        const city = data.address.city || data.address.town || data.address.county || data.address.state || "";
+        // Ambil alamat lengkap
+        const fullAddress = data.display_name || "";
+        
+        setForm((prev) => ({
+          ...prev,
+          city: city,
+          address: fullAddress
+        }));
+      }
+    } catch (error) {
+      console.error("Gagal mengambil alamat:", error);
+    } finally {
+      setIsFetchingAddress(false);
+    }
+  };
+
+  // Inisialisasi Peta
   useEffect(() => {
     if (!window.L || !mapContainerRef.current) return;
 
-    // Fix marker icons pathing
     delete window.L.Icon.Default.prototype._getIconUrl;
     window.L.Icon.Default.mergeOptions({
-      iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-      iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-      shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+      iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+      shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
     });
 
     const initLat = Number(form.lat) || -6.2;
     const initLng = Number(form.lng) || 106.8;
 
-    // Create Map
     const map = window.L.map(mapContainerRef.current).setView([initLat, initLng], 13);
     mapRef.current = map;
 
-    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
+    window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "© OpenStreetMap",
     }).addTo(map);
 
-    // Create Draggable Marker
     const marker = window.L.marker([initLat, initLng], { draggable: true }).addTo(map);
     markerRef.current = marker;
 
-    // Sync marker drag coordinates to form
-    marker.on('dragend', () => {
+    // Aksi saat marker digeser (drag)
+    marker.on("dragend", () => {
       const position = marker.getLatLng();
-      updateForm('lat', Number(position.lat.toFixed(6)));
-      updateForm('lng', Number(position.lng.toFixed(6)));
+      const newLat = Number(position.lat.toFixed(6));
+      const newLng = Number(position.lng.toFixed(6));
+      updateForm("lat", newLat);
+      updateForm("lng", newLng);
+      fetchAddressFromCoords(newLat, newLng); // Otomatis ambil alamat
     });
 
-    // Map click moves marker and updates form
-    map.on('click', (e) => {
+    // Aksi saat peta diklik
+    map.on("click", (e) => {
+      const newLat = Number(e.latlng.lat.toFixed(6));
+      const newLng = Number(e.latlng.lng.toFixed(6));
       marker.setLatLng(e.latlng);
-      updateForm('lat', Number(e.latlng.lat.toFixed(6)));
-      updateForm('lng', Number(e.latlng.lng.toFixed(6)));
+      updateForm("lat", newLat);
+      updateForm("lng", newLng);
+      fetchAddressFromCoords(newLat, newLng); // Otomatis ambil alamat
     });
 
-    // Resize map on load to prevent rendering issues in modal
-    setTimeout(() => {
-      map.invalidateSize();
-    }, 200);
+    setTimeout(() => map.invalidateSize(), 200);
 
     return () => {
       if (mapRef.current) {
@@ -157,687 +178,236 @@ export default function EventForm({
     };
   }, []);
 
-  // Update map marker when manual inputs change
+  // Aksi saat input koordinat diubah manual
   const handleManualCoordsChange = (field, val) => {
     const num = Number(val);
     updateForm(field, val);
 
     if (!isNaN(num) && mapRef.current && markerRef.current) {
-      const newLat = field === 'lat' ? num : Number(form.lat);
-      const newLng = field === 'lng' ? num : Number(form.lng);
+      const newLat = field === "lat" ? num : Number(form.lat);
+      const newLng = field === "lng" ? num : Number(form.lng);
 
       markerRef.current.setLatLng([newLat, newLng]);
       mapRef.current.panTo([newLat, newLng]);
+      
+      // Jika user selesai ngetik (bisa pakai debounce, tapi disederhanakan disini)
+      if (newLat && newLng) {
+        fetchAddressFromCoords(newLat, newLng);
+      }
     }
   };
 
-  const handleLineupChange = (index, value) => {
-    setLineup(prev =>
-      prev.map((item, idx) =>
-        idx === index ? value : item
-      )
-    );
-  };
-
-  const addLineupField = () => {
-    setLineup(prev => [...prev, '']);
-  };
-
-  const removeLineupField = index => {
-    setLineup(prev =>
-      prev.filter((_, idx) => idx !== index)
-    );
-  };
-
-  const updateCategory = (index, field, value) => {
-    setCategories(prev =>
-      prev.map((category, idx) =>
-        idx === index
-          ? {
-              ...category,
-              [field]: value
-            }
-          : category
-      )
-    );
-  };
-
-  const addCategory = () => {
-    setCategories(prev => [
-      ...prev,
-      {
-        name: '',
-        price: '',
-        quota: ''
-      }
-    ]);
-  };
-
-  const removeCategory = index => {
-    if (categories.length === 1) return;
-    setCategories(prev =>
-      prev.filter((_, idx) => idx !== index)
-    );
-  };
-
-  const handleSubmit = e => {
+  const handleSubmit = (e) => {
     e.preventDefault();
 
-    const cleanLineup = lineup.filter(
-      item => item.trim() !== ''
-    );
-
     const cleanCategories = categories
-      .filter(category => category.name.trim() !== '')
-      .map(category => ({
-        ...(category.id ? { id: category.id } : {}),
-        name: category.name.trim(),
-        price: Number(category.price),
-        quota: Number(category.quota),
-        sold: Number(category.sold || 0)
+      .filter((c) => c.name.trim() !== "")
+      .map((c) => ({
+        ...(c.id ? { id: c.id } : {}),
+        name: c.name.trim(),
+        price: Number(c.price),
+        quota: Number(c.quota),
+        sold: Number(c.sold || 0),
       }));
 
     if (cleanCategories.length === 0) {
-      alert('Minimal harus ada 1 kategori tiket.');
+      alert("Minimal harus ada 1 kategori tiket.");
       return;
     }
-
-    const invalidCategory = cleanCategories.some(
-      category =>
-        category.price < 0 ||
-        category.quota < 1
-    );
-
-    if (invalidCategory) {
-      alert('Harga tiket tidak boleh negatif dan kuota minimal 1.');
-      return;
-    }
-
-    const cheapestPrice = Math.min(
-      ...cleanCategories.map(category =>
-        Number(category.price)
-      )
-    );
 
     onSubmit({
       ...form,
       lat: Number(form.lat) || -6.2,
       lng: Number(form.lng) || 106.8,
-      artist:
-        form.artist ||
-        cleanLineup[0] ||
-        'Berbagai Artis',
-      lineup: cleanLineup,
-      secondaryTag: form.category,
       categories: cleanCategories,
-      price: cheapestPrice,
-      tickets: cleanCategories.map(category => ({
-        type: category.name
-          .toLowerCase()
-          .includes('vip')
-          ? 'vip'
-          : 'regular',
-        name: category.name,
-        price: category.price,
-        benefits: category.name
-          .toLowerCase()
-          .includes('vip')
-          ? [
-              'Akses area VIP',
-              'Merchandise eksklusif'
-            ]
-          : [
-              'Akses area umum',
-              'E-ticket QR'
-            ]
-      }))
+      price: Math.min(...cleanCategories.map((c) => Number(c.price))),
     });
   };
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 100,
-        backgroundColor: 'rgba(5, 5, 8, 0.88)',
-        backdropFilter: 'blur(10px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '16px'
-      }}
-    >
-      {/* Modal Card */}
-      <div
-        style={{
-          backgroundColor: '#161826',
-          borderRadius: '24px',
-          border: '1px solid #1e2235',
-          maxWidth: '750px',
-          width: '100%',
-          padding: '28px',
-          position: 'relative',
-          maxHeight: '90vh',
-          overflowY: 'auto',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)'
-        }}
-      >
-        {/* Style block for hover border effects and Leaflet container */}
-        <style>{`
-          .form-input-field:focus {
-            border-color: #ec4899 !important;
-            box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.15);
-          }
-          .form-close-btn:hover {
-            color: #fff !important;
-            background-color: rgba(255, 255, 255, 0.05);
-          }
-          /* Override Leaflet internal styling to match dark theme */
-          .leaflet-container {
-            font-family: inherit;
-          }
-          .leaflet-bar a {
-            background-color: #161826 !important;
-            color: #fff !important;
-            border-bottom: 1px solid #282c42 !important;
-          }
-        `}</style>
+    <div style={{ position: "fixed", inset: 0, zIndex: 100, backgroundColor: "rgba(5, 5, 8, 0.88)", backdropFilter: "blur(10px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <style>{`
+        .form-input-field:focus { border-color: ${THEME.pink} !important; box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.15); }
+        .org-form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .org-form-grid-cat { display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 8px; align-items: center; }
+        
+        /* Style Kustom untuk Kalender Input Date */
+        input[type="date"]::-webkit-calendar-picker-indicator {
+          filter: invert(1);
+          opacity: 0.6;
+          cursor: pointer;
+        }
 
-        {/* Close Modal Button */}
-        <button
-          type="button"
-          onClick={onClose}
-          className="form-close-btn"
-          style={{
-            position: 'absolute',
-            top: '18px',
-            right: '18px',
-            background: 'none',
-            border: 'none',
-            color: '#9ca3af',
-            cursor: 'pointer',
-            padding: '8px',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'all 0.2s'
-          }}
-        >
+        @media (max-width: 600px) {
+          .org-form-grid-2 { grid-template-columns: 1fr; }
+          .org-form-grid-cat { grid-template-columns: 1fr; }
+        }
+      `}</style>
+
+      <div style={{ backgroundColor: THEME.surface, borderRadius: 24, border: `1px solid ${THEME.border}`, maxWidth: 750, width: "100%", padding: 28, position: "relative", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.7)" }}>
+        <button type="button" onClick={onClose} style={{ position: "absolute", top: 18, right: 18, background: "none", border: "none", color: THEME.muted, cursor: "pointer", padding: 8, borderRadius: "50%", display: "flex" }}>
           <X size={20} />
         </button>
 
-        <div style={{ marginBottom: '24px' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: '#38bdf8', fontWeight: '800', letterSpacing: '1px', textTransform: 'uppercase', backgroundColor: 'rgba(56, 189, 248, 0.08)', padding: '4px 10px', borderRadius: '8px', marginBottom: '8px' }}>
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.72rem", color: THEME.pink, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", backgroundColor: "rgba(236, 72, 153, 0.08)", padding: "4px 10px", borderRadius: 8, marginBottom: 8 }}>
             <Sparkles size={12} /> Auralis Portal EO
           </div>
-          <h3
-            style={{
-              fontSize: '1.45rem',
-              fontWeight: '900',
-              color: '#fff',
-              margin: 0,
-              letterSpacing: '-0.5px'
-            }}
-          >
-            {initialData ? 'Edit Konser Anda' : 'Buat Konser Baru'}
+          <h3 style={{ fontSize: "1.45rem", fontWeight: 900, color: THEME.text, margin: 0 }}>
+            {initialData ? "Edit Konser Anda" : "Buat Konser Baru"}
           </h3>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column" }}>
           
           {/* SECTION 1: INFORMASI UTAMA */}
           <div style={cardSectionStyle}>
-            <div style={sectionTitleStyle}>
-              <Ticket size={18} /> Informasi Utama
-            </div>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+            <div style={sectionTitleStyle}><Ticket size={18} /> Informasi Utama</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div className="org-form-grid-2">
                 <div>
                   <label style={labelStyle}>Judul Konser/Event</label>
-                  <input
-                    type="text"
-                    required
-                    className="form-input-field"
-                    value={form.title}
-                    onChange={e => updateForm('title', e.target.value)}
-                    style={inputStyle}
-                    placeholder="Contoh: Harmoni Malam Jazz"
-                  />
+                  <input type="text" required value={form.title} onChange={(e) => updateForm("title", e.target.value)} style={inputStyle} placeholder="Contoh: Harmoni Malam Jazz" className="form-input-field" />
                 </div>
                 <div>
                   <label style={labelStyle}>Artis Utama</label>
-                  <input
-                    type="text"
-                    className="form-input-field"
-                    value={form.artist}
-                    onChange={e => updateForm('artist', e.target.value)}
-                    style={inputStyle}
-                    placeholder="Contoh: Tulus & Friends"
-                  />
+                  <input type="text" value={form.artist} onChange={(e) => updateForm("artist", e.target.value)} style={inputStyle} placeholder="Contoh: Tulus & Friends" className="form-input-field" />
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              <div className="org-form-grid-2">
                 <div>
-                  <label style={labelStyle}>Kategori Musik/Genre</label>
-                  <select
-                    value={form.category}
-                    onChange={e => updateForm('category', e.target.value)}
-                    className="form-input-field"
-                    style={{ ...inputStyle, appearance: 'none' }}
-                  >
+                  <label style={labelStyle}>Kategori Musik</label>
+                  <select value={form.category} onChange={(e) => updateForm("category", e.target.value)} style={{ ...inputStyle, appearance: "none" }} className="form-input-field">
                     <option value="Concert">Concert</option>
                     <option value="Festival">Festival</option>
                     <option value="Acoustic">Acoustic</option>
                     <option value="EDM">EDM</option>
                     <option value="Indie">Indie</option>
                     <option value="Jazz">Jazz</option>
-                    <option value="Pop">Pop</option>
-                    <option value="Rock">Rock</option>
+                    <option value="K-Pop">K-Pop</option>
                   </select>
                 </div>
                 <div>
                   <label style={labelStyle}>Status Penerbitan</label>
-                  <select
-                    value={form.status}
-                    onChange={e => updateForm('status', e.target.value)}
-                    className="form-input-field"
-                    style={{ ...inputStyle, appearance: 'none' }}
-                  >
-                    <option value="draft">Draft (Simpan internal)</option>
-                    <option value="published">Published (Langsung tayang ke user)</option>
+                  <select value={form.status} onChange={(e) => updateForm("status", e.target.value)} style={{ ...inputStyle, appearance: "none" }} className="form-input-field">
+                    <option value="draft">Draft</option>
+                    <option value="published">Published</option>
                   </select>
                 </div>
               </div>
 
               <div>
                 <label style={labelStyle}>URL Gambar Banner</label>
-                <input
-                  type="url"
-                  className="form-input-field"
-                  value={form.image}
-                  onChange={e => updateForm('image', e.target.value)}
-                  style={inputStyle}
-                  placeholder="https://images.unsplash.com/..."
-                />
+                <input type="url" value={form.image} onChange={(e) => updateForm("image", e.target.value)} style={inputStyle} placeholder="https://..." className="form-input-field" />
               </div>
 
               <div>
                 <label style={labelStyle}>Deskripsi Acara</label>
-                <textarea
-                  rows={3}
-                  value={form.description}
-                  onChange={e => updateForm('description', e.target.value)}
-                  className="form-input-field"
-                  style={{
-                    ...inputStyle,
-                    resize: 'vertical',
-                    fontFamily: 'inherit'
-                  }}
-                  placeholder="Berikan deskripsi detail konser Anda..."
-                />
-              </div>
-
-              {/* Lineup Artis */}
-              <div>
-                <label style={labelStyle}>Lineup Pendukung</label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {lineup.map((item, idx) => (
-                    <div key={idx} style={{ display: 'flex', gap: '8px' }}>
-                      <input
-                        type="text"
-                        value={item}
-                        onChange={e => handleLineupChange(idx, e.target.value)}
-                        className="form-input-field"
-                        style={inputStyle}
-                        placeholder={`Nama Artis/Band ${idx + 1}`}
-                      />
-                      {lineup.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeLineupField(idx)}
-                          style={{
-                            background: 'rgba(244,63,94,0.1)',
-                            border: '1px solid rgba(244,63,94,0.2)',
-                            borderRadius: '12px',
-                            padding: '0 12px',
-                            color: '#f43f5e',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={addLineupField}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px',
-                      padding: '10px',
-                      borderRadius: '12px',
-                      border: '1px dashed #282c42',
-                      backgroundColor: 'transparent',
-                      color: '#9ca3af',
-                      cursor: 'pointer',
-                      fontSize: '0.8rem',
-                      fontWeight: '600',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    <Plus size={14} /> Tambah Lineup Artis
-                  </button>
-                </div>
+                <textarea rows={3} value={form.description} onChange={(e) => updateForm("description", e.target.value)} style={{ ...inputStyle, resize: "vertical" }} placeholder="Berikan deskripsi detail konser..." className="form-input-field" />
               </div>
             </div>
           </div>
 
           {/* SECTION 2: JADWAL & KETENTUAN */}
           <div style={cardSectionStyle}>
-            <div style={sectionTitleStyle}>
-              <Calendar size={18} /> Jadwal & Ketentuan
-            </div>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+            <div style={sectionTitleStyle}><Calendar size={18} /> Jadwal & Ketentuan</div>
+            <div className="org-form-grid-2" style={{ marginBottom: 14 }}>
               <div>
                 <label style={labelStyle}>Tanggal Pelaksanaan</label>
-                <input
-                  type="date"
-                  required
-                  className="form-input-field"
-                  value={form.date}
-                  onChange={e => updateForm('date', e.target.value)}
-                  style={inputStyle}
-                />
+                {/* INPUT DATE DENGAN KALENDER */}
+                <input type="date" required value={form.date} onChange={(e) => updateForm("date", e.target.value)} style={inputStyle} className="form-input-field" />
               </div>
               <div>
-                <label style={labelStyle}>Batas Usia Penonton</label>
-                <select
-                  value={form.ageLimit}
-                  onChange={e => updateForm('ageLimit', e.target.value)}
-                  className="form-input-field"
-                  style={{ ...inputStyle, appearance: 'none' }}
-                >
+                <label style={labelStyle}>Batas Usia</label>
+                <select value={form.ageLimit} onChange={(e) => updateForm("ageLimit", e.target.value)} style={{ ...inputStyle, appearance: "none" }} className="form-input-field">
                   <option value="Semua umur">Semua umur</option>
-                  <option value="13+">Remaja (13+)</option>
-                  <option value="17+">Dewasa (17+)</option>
-                  <option value="18+">Dewasa (18+)</option>
+                  <option value="13+">13+</option>
+                  <option value="17+">17+</option>
+                  <option value="18+">18+</option>
                 </select>
               </div>
             </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+            <div className="org-form-grid-2">
               <div>
-                <label style={labelStyle}>Gerbang Dibuka (Doors Open)</label>
-                <input
-                  type="time"
-                  className="form-input-field"
-                  value={form.doorsOpen}
-                  onChange={e => updateForm('doorsOpen', e.target.value)}
-                  style={inputStyle}
-                />
+                <label style={labelStyle}>Gerbang Dibuka</label>
+                <input type="time" value={form.doorsOpen} onChange={(e) => updateForm("doorsOpen", e.target.value)} style={inputStyle} className="form-input-field" />
               </div>
               <div>
-                <label style={labelStyle}>Konser Dimulai (Show Starts)</label>
-                <input
-                  type="time"
-                  className="form-input-field"
-                  value={form.showStarts}
-                  onChange={e => updateForm('showStarts', e.target.value)}
-                  style={inputStyle}
-                />
+                <label style={labelStyle}>Konser Dimulai</label>
+                <input type="time" value={form.showStarts} onChange={(e) => updateForm("showStarts", e.target.value)} style={inputStyle} className="form-input-field" />
               </div>
             </div>
           </div>
 
-          {/* SECTION 3: LOKASI & KOORDINAT PETA */}
+          {/* SECTION 3: LOKASI & PETA */}
           <div style={cardSectionStyle}>
-            <div style={sectionTitleStyle}>
-              <MapPin size={18} /> Detail Lokasi & Peta Koordinat
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+            <div style={sectionTitleStyle}><MapPin size={18} /> Lokasi & Peta</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              
+              <div className="org-form-grid-2">
                 <div>
-                  <label style={labelStyle}>Nama Venue / Tempat</label>
-                  <input
-                    type="text"
-                    required
-                    className="form-input-field"
-                    value={form.venue}
-                    onChange={e => updateForm('venue', e.target.value)}
-                    style={inputStyle}
-                    placeholder="Contoh: Balai Sarbini"
-                  />
+                  <label style={labelStyle}>Nama Venue / Gedung</label>
+                  <input type="text" required value={form.venue} onChange={(e) => updateForm("venue", e.target.value)} style={inputStyle} placeholder="Contoh: Gelora Bung Karno" className="form-input-field" />
                 </div>
                 <div>
-                  <label style={labelStyle}>Kota</label>
-                  <input
-                    type="text"
-                    required
-                    className="form-input-field"
-                    value={form.city}
-                    onChange={e => updateForm('city', e.target.value)}
-                    style={inputStyle}
-                    placeholder="Contoh: Jakarta"
-                  />
+                  <label style={labelStyle}>Kota (Otomatis dari Peta)</label>
+                  <input type="text" required value={form.city} onChange={(e) => updateForm("city", e.target.value)} style={inputStyle} placeholder="Contoh: Jakarta" className="form-input-field" />
                 </div>
               </div>
 
               <div>
-                <label style={labelStyle}>Alamat Lengkap Venue</label>
-                <input
-                  type="text"
-                  className="form-input-field"
-                  value={form.address}
-                  onChange={e => updateForm('address', e.target.value)}
-                  style={inputStyle}
-                  placeholder="Jl. Sisingamangaraja No.73, Jakarta Selatan"
-                />
+                <label style={labelStyle}>Alamat Lengkap (Otomatis dari Peta)</label>
+                <input type="text" value={form.address} onChange={(e) => updateForm("address", e.target.value)} style={inputStyle} placeholder="Alamat akan terisi otomatis saat kamu klik peta" className="form-input-field" />
               </div>
 
-              {/* Coordinates Inputs */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              <div className="org-form-grid-2">
                 <div>
-                  <label style={labelStyle}>Latitude (Garis Lintang)</label>
-                  <input
-                    type="number"
-                    step="any"
-                    required
-                    className="form-input-field"
-                    value={form.lat}
-                    onChange={e => handleManualCoordsChange('lat', e.target.value)}
-                    style={inputStyle}
-                    placeholder="-6.2297"
-                  />
+                  <label style={labelStyle}>Latitude</label>
+                  <input type="number" step="any" required value={form.lat} onChange={(e) => handleManualCoordsChange("lat", e.target.value)} style={inputStyle} placeholder="-6.2297" className="form-input-field" />
                 </div>
                 <div>
-                  <label style={labelStyle}>Longitude (Garis Bujur)</label>
-                  <input
-                    type="number"
-                    step="any"
-                    required
-                    className="form-input-field"
-                    value={form.lng}
-                    onChange={e => handleManualCoordsChange('lng', e.target.value)}
-                    style={inputStyle}
-                    placeholder="106.8175"
-                  />
+                  <label style={labelStyle}>Longitude</label>
+                  <input type="number" step="any" required value={form.lng} onChange={(e) => handleManualCoordsChange("lng", e.target.value)} style={inputStyle} placeholder="106.8175" className="form-input-field" />
                 </div>
               </div>
 
-              {/* Map Container */}
               <div>
-                <span style={labelStyle}>Pilih Lokasi di Peta (Klik atau Drag Pin)</span>
-                <div 
-                  ref={mapContainerRef} 
-                  style={{ 
-                    height: '240px', 
-                    borderRadius: '14px', 
-                    border: '1px solid #282c42',
-                    overflow: 'hidden',
-                    zIndex: 1,
-                    marginTop: '8px'
-                  }}
-                />
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <span style={labelStyle}>Pilih Lokasi di Peta (Klik / Geser Pin)</span>
+                  {isFetchingAddress && <span style={{ fontSize: "0.75rem", color: THEME.pink, display: "flex", alignItems: "center", gap: 4 }}><Loader2 size={12} style={{ animation: "spin 1s linear infinite" }} /> Mencari Alamat...</span>}
+                </div>
+                <div ref={mapContainerRef} style={{ height: 240, borderRadius: 14, border: `1px solid ${THEME.borderStrong}`, overflow: "hidden", zIndex: 1 }} />
               </div>
             </div>
           </div>
 
           {/* SECTION 4: KATEGORI TIKET */}
           <div style={cardSectionStyle}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '14px'
-              }}
-            >
-              <div style={{ ...sectionTitleStyle, marginBottom: 0 }}>
-                <Ticket size={18} /> Kategori Tiket Awal
-              </div>
-
-              <button
-                type="button"
-                onClick={addCategory}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '6px 12px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: 'rgba(236,72,153,0.1)',
-                  color: '#ec4899',
-                  cursor: 'pointer',
-                  fontSize: '0.78rem',
-                  fontWeight: '700',
-                  transition: 'all 0.2s'
-                }}
-              >
-                <Plus size={14} /> Tambah Kategori
+            <div style={{ ...sectionTitleStyle, justifyContent: "space-between" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}><Ticket size={18} /> Kategori Tiket</div>
+              <button type="button" onClick={() => setCategories((prev) => [...prev, { name: "", price: "", quota: "" }])} style={{ padding: "6px 12px", borderRadius: 8, border: "none", background: "rgba(236,72,153,0.1)", color: THEME.pink, cursor: "pointer", fontSize: "0.78rem", fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
+                <Plus size={14} /> Tambah
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {categories.map((category, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    backgroundColor: '#161826',
-                    borderRadius: '12px',
-                    padding: '12px',
-                    border: '1px solid #282c42'
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '2fr 1fr 1fr auto',
-                      gap: '8px',
-                      alignItems: 'center'
-                    }}
-                  >
-                    <input
-                      type="text"
-                      required
-                      className="form-input-field"
-                      value={category.name}
-                      onChange={e => updateCategory(idx, 'name', e.target.value)}
-                      style={inputStyle}
-                      placeholder="Contoh: VIP / Reguler"
-                    />
-
-                    <input
-                      type="number"
-                      required
-                      min="0"
-                      className="form-input-field"
-                      value={category.price}
-                      onChange={e => updateCategory(idx, 'price', e.target.value)}
-                      style={inputStyle}
-                      placeholder="Harga ($)"
-                    />
-
-                    <input
-                      type="number"
-                      required
-                      min="1"
-                      className="form-input-field"
-                      value={category.quota}
-                      onChange={e => updateCategory(idx, 'quota', e.target.value)}
-                      style={inputStyle}
-                      placeholder="Kuota"
-                    />
-
-                    <button
-                      type="button"
-                      onClick={() => removeCategory(idx)}
-                      disabled={categories.length === 1}
-                      style={{
-                        width: '38px',
-                        height: '38px',
-                        border: 'none',
-                        borderRadius: '10px',
-                        background: categories.length === 1 ? 'rgba(255,255,255,0.02)' : 'rgba(244,63,94,0.1)',
-                        color: categories.length === 1 ? '#4b5563' : '#f43f5e',
-                        cursor: categories.length === 1 ? 'not-allowed' : 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {categories.map((cat, idx) => (
+                <div key={idx} className="org-form-grid-cat">
+                  <input type="text" required placeholder="Nama (VIP/Reguler)" value={cat.name} onChange={(e) => { const newC = [...categories]; newC[idx].name = e.target.value; setCategories(newC); }} style={inputStyle} className="form-input-field" />
+                  <input type="number" required min="0" placeholder="Harga" value={cat.price} onChange={(e) => { const newC = [...categories]; newC[idx].price = e.target.value; setCategories(newC); }} style={inputStyle} className="form-input-field" />
+                  <input type="number" required min="1" placeholder="Kuota" value={cat.quota} onChange={(e) => { const newC = [...categories]; newC[idx].quota = e.target.value; setCategories(newC); }} style={inputStyle} className="form-input-field" />
+                  <button type="button" onClick={() => { if (categories.length === 1) return; setCategories(categories.filter((_, i) => i !== idx)); }} style={{ width: 40, height: 40, border: "none", borderRadius: 10, background: "rgba(239, 68, 68, 0.1)", color: THEME.danger, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                    <Trash2 size={16} />
+                  </button>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Submit Action */}
-          <button
-            type="submit"
-            disabled={submitting}
-            style={{
-              width: '100%',
-              padding: '14px',
-              borderRadius: '14px',
-              border: 'none',
-              fontWeight: '800',
-              fontSize: '0.95rem',
-              cursor: submitting ? 'not-allowed' : 'pointer',
-              marginTop: '10px',
-              background: 'linear-gradient(135deg, #ec4899 0%, #a855f7 100%)',
-              color: '#fff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              boxShadow: '0 8px 20px rgba(236, 72, 153, 0.25)',
-              opacity: submitting ? 0.75 : 1,
-              transition: 'all 0.2s'
-            }}
-          >
-            {submitting ? (
-              <Loader2
-                size={18}
-                style={{
-                  animation: 'spin 1s linear infinite'
-                }}
-              />
-            ) : null}
-            {initialData ? 'Simpan Perubahan Konser' : 'Terbitkan Konser & Tiket'}
+          <button type="submit" disabled={submitting} style={{ width: "100%", padding: 14, borderRadius: 14, border: "none", fontWeight: 800, fontSize: "0.95rem", cursor: submitting ? "not-allowed" : "pointer", marginTop: 10, background: THEME.gradient, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: "0 8px 20px rgba(236, 72, 153, 0.25)", opacity: submitting ? 0.75 : 1 }}>
+            {submitting && <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} />}
+            {initialData ? "Simpan Perubahan" : "Terbitkan Konser"}
           </button>
         </form>
       </div>

@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { FavoriteProvider } from "./user/context/FavoriteContext";
 import { TransactionProvider } from "./user/context/TransactionContext";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 import Landing from "./landing/app";
 import Register from "./register/app";
@@ -11,7 +12,9 @@ import Home from "./user/home/app";
 import Explore from "./user/explore/app";
 import EventDetail from "./user/detail/app";
 import MyTickets from "./user/my-tickets/app";
+import TicketDetail from "./user/my-tickets/TicketDetail";
 import History from "./user/history/app";
+import OrderDetail from "./user/order-detail/app";
 import Checkout from "./user/Checkout/app";
 import Cart from "./user/cart/app";
 import Favorites from "./user/favorites/app";
@@ -32,21 +35,128 @@ export default function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/login" element={<Login />} />
 
-              <Route path="/home" element={<Home />} />
-              <Route path="/explore" element={<Explore />} />
-              <Route path="/detail/:id" element={<EventDetail />} />
+              <Route
+                path="/home"
+                element={
+                  <ProtectedRoute allowedRoles={["User"]}>
+                    <Home />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/explore"
+                element={
+                  <ProtectedRoute allowedRoles={["User"]}>
+                    <Explore />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/detail/:id"
+                element={
+                  <ProtectedRoute allowedRoles={["User"]}>
+                    <EventDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/my-tickets"
+                element={
+                  <ProtectedRoute allowedRoles={["User"]}>
+                    <MyTickets />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/tickets/:id"
+                element={
+                  <ProtectedRoute allowedRoles={["User"]}>
+                    <TicketDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/history"
+                element={
+                  <ProtectedRoute allowedRoles={["User"]}>
+                    <History />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/order/:id"
+                element={
+                  <ProtectedRoute allowedRoles={["User"]}>
+                    <OrderDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/order-detail/:id"
+                element={
+                  <ProtectedRoute allowedRoles={["User"]}>
+                    <OrderDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/checkout"
+                element={
+                  <ProtectedRoute allowedRoles={["User"]}>
+                    <Checkout />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/cart"
+                element={
+                  <ProtectedRoute allowedRoles={["User"]}>
+                    <Cart />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/favorites"
+                element={
+                  <ProtectedRoute allowedRoles={["User"]}>
+                    <Favorites />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/notifications"
+                element={
+                  <ProtectedRoute allowedRoles={["User"]}>
+                    <Notifications />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute allowedRoles={["User"]}>
+                    <Profile />
+                  </ProtectedRoute>
+                }
+              />
 
-              <Route path="/my-tickets" element={<MyTickets />} />
-              <Route path="/history" element={<History />} />
+              <Route
+                path="/organizer/*"
+                element={
+                  <ProtectedRoute allowedRoles={["Penyelenggara", "Admin"]}>
+                    <OrganizerApp />
+                  </ProtectedRoute>
+                }
+              />
 
-              <Route path="/checkout" element={<Checkout />} />
-              <Route path="/cart" element={<Cart />} />
-              <Route path="/favorites" element={<Favorites />} />
-              <Route path="/notifications" element={<Notifications />} />
-              <Route path="/profile" element={<Profile />} />
-
-              <Route path="/organizer/*" element={<OrganizerApp />} />
-              <Route path="/admin/*" element={<AdminApp />} />
+              <Route
+                path="/admin/*"
+                element={
+                  <ProtectedRoute allowedRoles={["Admin"]}>
+                    <AdminApp />
+                  </ProtectedRoute>
+                }
+              />
 
               <Route
                 path="*"

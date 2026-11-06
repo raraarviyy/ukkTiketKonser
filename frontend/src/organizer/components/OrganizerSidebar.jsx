@@ -1,81 +1,188 @@
-import React from 'react';
-import { LayoutDashboard, CalendarRange, Wallet, Star, Menu, X } from 'lucide-react';
+import React from "react";
+import {
+  LayoutDashboard,
+  CalendarRange,
+  Wallet,
+  Star,
+  Menu,
+  X,
+  LogOut,
+  Ticket,
+  UserCircle,
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { THEME } from "../../theme";
+import { useAuth } from "../../context/AuthContext";
 
 const NAV_ITEMS = [
-  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { key: 'events', label: 'Manajemen Event', icon: CalendarRange },
-  { key: 'revenue', label: 'Laporan Pendapatan', icon: Wallet },
-  { key: 'reviews', label: 'Ulasan Penonton', icon: Star }
+  { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { key: "events", label: "Manajemen Event", icon: CalendarRange },
+  { key: "revenue", label: "Laporan Pendapatan", icon: Wallet },
+  { key: "reviews", label: "Ulasan Penonton", icon: Star },
+  { key: "profile", label: "Profil", icon: UserCircle},
 ];
 
-export default function OrganizerSidebar({ activePage, onNavigate, mobileOpen, onCloseMobile }) {
+export default function OrganizerSidebar({
+  activePage = "dashboard",
+  onNavigate,
+  mobileOpen,
+  onCloseMobile,
+}) {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
+
+  const handleLogout = () => {
+    logout?.();
+    navigate("/login");
+  };
+
   return (
     <>
-      {mobileOpen && (
-        <div
-          onClick={onCloseMobile}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0,0,0,0.6)',
-            zIndex: 45
-          }}
-          className="organizer-sidebar-overlay"
-        />
-      )}
+      <style>{`
+        .org-sidebar {
+          position: fixed;
+          top: 0; left: 0; bottom: 0;
+          width: 260px;
+          background-color: ${THEME.surface};
+          border-right: 1px solid ${THEME.border};
+          padding: 20px 14px;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          z-index: 50;
+          transform: translateX(0);
+          transition: transform 0.3s ease;
+        }
+        .org-sidebar-close { display: none; }
+        .org-mobile-btn { display: none; }
+        .org-overlay { display: none; }
 
-      <aside
-        className={`organizer-sidebar ${mobileOpen ? 'organizer-sidebar-open' : ''}`}
-        style={{
-          backgroundColor: '#0f172a',
-          borderRight: '1px solid rgba(255,255,255,0.08)',
-          padding: '24px 16px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', padding: '0 8px' }}>
-          <span style={{ fontSize: '1.1rem', fontWeight: '800', color: '#fff' }}>
-            Panel <span style={{ color: '#a855f7' }}>Organizer</span>
-          </span>
+        @media (max-width: 900px) {
+          .org-sidebar { transform: translateX(-100%); }
+          .org-sidebar.open { transform: translateX(0); }
+          .org-sidebar-close { display: flex !important; }
+          .org-mobile-btn { display: flex !important; }
+          .org-overlay.open {
+            display: block;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+            z-index: 40;
+          }
+        }
+      `}</style>
+
+      <div
+        className={`org-overlay ${mobileOpen ? "open" : ""}`}
+        onClick={onCloseMobile}
+      />
+
+      <aside className={`org-sidebar ${mobileOpen ? "open" : ""}`}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 20,
+            padding: "0 8px",
+          }}
+        >
+          <div
+            onClick={() => navigate("/")}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              cursor: "pointer",
+            }}
+          >
+            <div
+              style={{
+                padding: "6px 8px",
+                background: THEME.gradient,
+                borderRadius: 10,
+                display: "flex",
+              }}
+            >
+              <Ticket size={18} color="#fff" />
+            </div>
+            <span
+              style={{
+                fontSize: "1.1rem",
+                fontWeight: 800,
+                color: THEME.text,
+              }}
+            >
+              Aur<span style={{ color: THEME.pink }}>alis</span>
+            </span>
+          </div>
           <button
+            className="org-sidebar-close"
             onClick={onCloseMobile}
-            className="organizer-sidebar-close"
-            style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+            style={{
+              background: "none",
+              border: "none",
+              color: THEME.muted,
+              cursor: "pointer",
+            }}
           >
             <X size={20} />
           </button>
         </div>
 
-        {NAV_ITEMS.map((item) => {
-          const Icon = item.icon;
-          const isActive = activePage === item.key;
-          return (
-            <button
-              key={item.key}
-              onClick={() => onNavigate(item.key)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                padding: '12px 14px',
-                borderRadius: '12px',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '0.92rem',
-                fontWeight: '600',
-                textAlign: 'left',
-                width: '100%',
-                background: isActive ? 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)' : 'transparent',
-                color: isActive ? '#fff' : '#94a3b8'
-              }}
-            >
-              <Icon size={18} />
-              {item.label}
-            </button>
-          );
-        })}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+          {NAV_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const isActive = activePage === item.key;
+            return (
+              <button
+                key={item.key}
+                onClick={() => onNavigate && onNavigate(item.key)} /* <-- INI PENGAMANNYA */
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "12px 14px",
+                  borderRadius: 12,
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: "0.9rem",
+                  fontWeight: 600,
+                  textAlign: "left",
+                  width: "100%",
+                  background: isActive ? THEME.gradient : "transparent",
+                  color: isActive ? "#fff" : THEME.muted,
+                }}
+              >
+                <Icon size={18} />
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <button
+          onClick={handleLogout}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "12px 14px",
+            borderRadius: 12,
+            border: "none",
+            cursor: "pointer",
+            fontSize: "0.9rem",
+            fontWeight: 600,
+            textAlign: "left",
+            width: "100%",
+            background: "transparent",
+            color: THEME.danger,
+          }}
+        >
+          <LogOut size={18} />
+          Logout
+        </button>
       </aside>
     </>
   );
@@ -84,16 +191,17 @@ export default function OrganizerSidebar({ activePage, onNavigate, mobileOpen, o
 export function OrganizerMobileToggle({ onOpen }) {
   return (
     <button
+      className="org-mobile-btn"
       onClick={onOpen}
-      className="organizer-mobile-toggle"
       style={{
-        background: '#1e293b',
-        border: '1px solid rgba(255,255,255,0.1)',
-        color: '#fff',
-        borderRadius: '10px',
-        padding: '10px',
-        cursor: 'pointer',
-        display: 'none'
+        background: THEME.surface,
+        border: `1px solid ${THEME.border}`,
+        color: THEME.text,
+        borderRadius: 10,
+        padding: 10,
+        cursor: "pointer",
+        alignItems: "center",
+        justifyContent: "center",
       }}
     >
       <Menu size={20} />

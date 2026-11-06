@@ -14,65 +14,40 @@ import {
   XCircle,
 } from "lucide-react";
 import { useAdmin } from "../context/AdminContext";
+import { THEME } from "../../theme";
 
 const formatCurrency = (value) =>
-  new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(value);
+  new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(value || 0);
 
-const formatNumber = (value) =>
-  new Intl.NumberFormat("id-ID").format(value);
+const formatNumber = (value) => new Intl.NumberFormat("id-ID").format(value || 0);
 
 const statusConfig = {
-  published: {
-    label: "Published",
-    className: "border-emerald-500/20 bg-emerald-500/10 text-emerald-400",
-  },
-  pending: {
-    label: "Pending",
-    className: "border-yellow-500/20 bg-yellow-500/10 text-yellow-400",
-  },
-  rejected: {
-    label: "Rejected",
-    className: "border-rose-500/20 bg-rose-500/10 text-rose-400",
-  },
-  cancelled: {
-    label: "Cancelled",
-    className: "border-orange-500/20 bg-orange-500/10 text-orange-400",
-  },
-  deleted: {
-    label: "Deleted",
-    className: "border-slate-500/20 bg-slate-500/10 text-slate-400",
-  },
+  published: { label: "Published", color: THEME.success, bg: "rgba(16,185,129,0.1)" },
+  pending: { label: "Pending", color: THEME.warning, bg: "rgba(245,158,11,0.1)" },
+  rejected: { label: "Rejected", color: THEME.danger, bg: "rgba(239,68,68,0.1)" },
+  cancelled: { label: "Cancelled", color: THEME.warning, bg: "rgba(245,158,11,0.1)" },
+  deleted: { label: "Deleted", color: THEME.muted, bg: "rgba(156,163,175,0.1)" },
 };
 
 function StatusBadge({ status }) {
   const config = statusConfig[status] || statusConfig.pending;
-
   return (
-    <span
-      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold ${config.className}`}
-    >
+    <span style={{ padding: "4px 10px", borderRadius: 20, fontSize: "0.7rem", fontWeight: 700, backgroundColor: config.bg, color: config.color, display: "inline-block" }}>
       {config.label}
     </span>
   );
 }
 
-function StatCard({ title, value, icon: Icon, iconClass }) {
+function StatCard({ title, value, icon: Icon, color }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-[#0d1422] p-5">
-      <div className="flex items-center justify-between">
+    <div style={{ backgroundColor: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 16, padding: 20 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <p className="text-xs font-medium text-slate-500">{title}</p>
-          <p className="mt-2 text-2xl font-bold text-white">{value}</p>
+          <p style={{ margin: 0, fontSize: "0.8rem", color: THEME.muted, fontWeight: 500 }}>{title}</p>
+          <h3 style={{ margin: "6px 0 0", fontSize: "clamp(1.2rem, 4vw, 1.5rem)", fontWeight: 800, color: THEME.text }}>{value}</h3>
         </div>
-
-        <div
-          className={`flex h-11 w-11 items-center justify-center rounded-xl ${iconClass}`}
-        >
-          <Icon size={20} />
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: `${color}15`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <Icon size={20} color={color} />
         </div>
       </div>
     </div>
@@ -80,618 +55,170 @@ function StatCard({ title, value, icon: Icon, iconClass }) {
 }
 
 export default function AdminConcerts() {
-  const {
-    events,
-    approveEvent,
-    rejectEvent,
-    cancelEvent,
-    softDeleteEvent,
-  } = useAdmin();
-
+  const { concerts, approveEvent, rejectEvent, cancelEvent, softDeleteEvent } = useAdmin();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [selected, setSelected] = useState(null);
   const [menuId, setMenuId] = useState(null);
   const [showFilter, setShowFilter] = useState(false);
 
-  const filteredEvents = useMemo(() => {
-    return events.filter((event) => {
-      const keyword = search.toLowerCase();
-
-      const matchesSearch =
-        event.name.toLowerCase().includes(keyword) ||
-        event.organizer.toLowerCase().includes(keyword) ||
-        event.location.toLowerCase().includes(keyword);
-
-      const matchesStatus =
-        statusFilter === "all" || event.status === statusFilter;
-
-      return matchesSearch && matchesStatus;
+  const filtered = useMemo(() => {
+    return concerts.filter((ev) => {
+      const kw = search.toLowerCase();
+      const matchSearch = (ev.name || "").toLowerCase().includes(kw) || (ev.organizer || "").toLowerCase().includes(kw) || (ev.location || "").toLowerCase().includes(kw);
+      const matchStatus = statusFilter === "all" || ev.status === statusFilter;
+      return matchSearch && matchStatus;
     });
-  }, [events, search, statusFilter]);
+  }, [concerts, search, statusFilter]);
 
-  const publishedCount = events.filter(
-    (event) => event.status === "published"
-  ).length;
+  const publishedCount = concerts.filter(e => e.status === "published").length;
+  const pendingCount = concerts.filter(e => e.status === "pending").length;
+  const rejectedCount = concerts.filter(e => e.status === "rejected").length;
 
-  const pendingCount = events.filter(
-    (event) => event.status === "pending"
-  ).length;
-
-  const rejectedCount = events.filter(
-    (event) => event.status === "rejected"
-  ).length;
-
-  const cancelledCount = events.filter(
-    (event) => event.status === "cancelled"
-  ).length;
-
-  const handleAction = (action, id) => {
-    if (action === "approve") {
-      approveEvent(id);
-    }
-
-    if (action === "reject") {
-      rejectEvent(id);
-    }
-
-    if (action === "cancel") {
-      cancelEvent(id);
-    }
-
-    if (action === "delete") {
-      softDeleteEvent(id);
-    }
-
+  const handleAction = async (action, id) => {
+    if (action === "approve") await approveEvent(id);
+    if (action === "reject") await rejectEvent(id);
+    if (action === "cancel") await cancelEvent(id);
+    if (action === "delete") await softDeleteEvent(id);
     setMenuId(null);
   };
 
   return (
-    <div className="mx-auto w-full max-w-[1600px]">
-      <div className="mb-8">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-300">
-              <CalendarDays size={13} />
-              Concert Management
-            </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 1400 }}>
+      <div>
+        <h1 style={{ margin: 0, fontSize: "clamp(1.4rem, 3vw, 1.9rem)", fontWeight: 800, color: THEME.text }}>Concert Management</h1>
+        <p style={{ margin: "6px 0 0", fontSize: "0.9rem", color: THEME.muted }}>Pantau seluruh konser di platform dan lakukan approval atau pembatalan.</p>
+      </div>
 
-            <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-              Concert Management
-            </h1>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
+        <StatCard title="Total Concert" value={formatNumber(concerts.length)} icon={CalendarDays} color={THEME.pink} />
+        <StatCard title="Published" value={formatNumber(publishedCount)} icon={Check} color={THEME.success} />
+        <StatCard title="Pending" value={formatNumber(pendingCount)} icon={Clock3} color={THEME.warning} />
+        <StatCard title="Rejected" value={formatNumber(rejectedCount)} icon={XCircle} color={THEME.danger} />
+      </div>
 
-            <p className="mt-2 max-w-2xl text-sm text-slate-400">
-              Pantau seluruh konser di platform dan lakukan approval,
-              penolakan, pembatalan, atau soft delete jika diperlukan.
-            </p>
-          </div>
+      <div style={{ backgroundColor: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 18, padding: 20, display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", background: THEME.bg, border: `1px solid ${THEME.border}`, borderRadius: 12, padding: "0 14px", flex: "1 1 300px" }}>
+          <Search size={18} color={THEME.dim} />
+          <input type="text" placeholder="Cari konser, organizer, atau lokasi..." value={search} onChange={e => setSearch(e.target.value)} style={{ width: "100%", background: "none", border: "none", padding: "12px", color: THEME.text, outline: "none", fontSize: "0.9rem" }} />
+        </div>
+        <div style={{ position: "relative" }}>
+          <button onClick={() => setShowFilter(!showFilter)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", background: THEME.bg, border: `1px solid ${THEME.border}`, borderRadius: 12, color: THEME.text, cursor: "pointer", fontSize: "0.85rem" }}>
+            {statusFilter === "all" ? "Semua Status" : statusConfig[statusFilter]?.label} <ChevronDown size={14} />
+          </button>
+          {showFilter && (
+            <>
+              <div style={{ position: "fixed", inset: 0, zIndex: 10 }} onClick={() => setShowFilter(false)} />
+              <div style={{ position: "absolute", right: 0, top: 44, background: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 12, padding: 6, zIndex: 20, minWidth: 160, boxShadow: "0 10px 25px rgba(0,0,0,0.5)" }}>
+                {["all", "published", "pending", "rejected"].map(s => (
+                  <button key={s} onClick={() => { setStatusFilter(s); setShowFilter(false); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 12px", background: "none", border: "none", color: statusFilter === s ? THEME.pink : THEME.muted, fontSize: "0.85rem", cursor: "pointer", borderRadius: 8 }}>
+                    {s === "all" ? "Semua Status" : statusConfig[s]?.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <StatCard
-          title="Total Concert"
-          value={formatNumber(events.length)}
-          icon={CalendarDays}
-          iconClass="bg-purple-500/10 text-purple-400"
-        />
-
-        <StatCard
-          title="Published"
-          value={formatNumber(publishedCount)}
-          icon={Check}
-          iconClass="bg-emerald-500/10 text-emerald-400"
-        />
-
-        <StatCard
-          title="Pending"
-          value={formatNumber(pendingCount)}
-          icon={Clock3}
-          iconClass="bg-yellow-500/10 text-yellow-400"
-        />
-
-        <StatCard
-          title="Rejected"
-          value={formatNumber(rejectedCount)}
-          icon={XCircle}
-          iconClass="bg-rose-500/10 text-rose-400"
-        />
-
-        <StatCard
-          title="Cancelled"
-          value={formatNumber(cancelledCount)}
-          icon={ShieldAlert}
-          iconClass="bg-orange-500/10 text-orange-400"
-        />
-      </div>
-
-      <div className="mt-6 rounded-2xl border border-white/10 bg-[#0d1422] p-4 sm:p-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="relative w-full lg:max-w-lg">
-            <Search
-              size={17}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600"
-            />
-
-            <input
-              type="text"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Cari konser, organizer, atau lokasi..."
-              className="h-11 w-full rounded-xl border border-white/10 bg-[#090f1b] pl-10 pr-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-purple-500/40"
-            />
-          </div>
-
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowFilter(!showFilter)}
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.02] px-4 text-xs font-semibold text-slate-300 transition hover:bg-white/5 hover:text-white lg:w-auto"
-            >
-              {statusFilter === "all"
-                ? "Semua Status"
-                : statusConfig[statusFilter]?.label}
-
-              <ChevronDown
-                size={15}
-                className={`transition ${
-                  showFilter ? "rotate-180" : ""
-                }`}
-              />
-            </button>
-
-            {showFilter && (
-              <>
-                <button
-                  type="button"
-                  aria-label="Close filter"
-                  onClick={() => setShowFilter(false)}
-                  className="fixed inset-0 z-10 cursor-default"
-                />
-
-                <div className="absolute right-0 top-12 z-20 w-48 rounded-xl border border-white/10 bg-[#151c2c] p-1.5 shadow-2xl">
-                  {[
-                    { value: "all", label: "Semua Status" },
-                    { value: "published", label: "Published" },
-                    { value: "pending", label: "Pending" },
-                    { value: "rejected", label: "Rejected" },
-                    { value: "cancelled", label: "Cancelled" },
-                    { value: "deleted", label: "Deleted" },
-                  ].map((filter) => (
-                    <button
-                      key={filter.value}
-                      type="button"
-                      onClick={() => {
-                        setStatusFilter(filter.value);
-                        setShowFilter(false);
-                      }}
-                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-xs transition ${
-                        statusFilter === filter.value
-                          ? "bg-purple-500/10 text-purple-400"
-                          : "text-slate-400 hover:bg-white/5 hover:text-white"
-                      }`}
-                    >
-                      {filter.label}
-
-                      {statusFilter === filter.value && (
-                        <Check size={14} />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-[#0d1422]">
-        <div className="border-b border-white/10 px-5 py-4">
-          <h2 className="text-sm font-semibold text-white">
-            Semua Concert
-          </h2>
-
-          <p className="mt-1 text-xs text-slate-500">
-            {filteredEvents.length} konser ditemukan
-          </p>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1050px]">
+      <div style={{ backgroundColor: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 18, overflow: "hidden" }}>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", minWidth: 900, borderCollapse: "collapse", fontSize: "0.85rem" }}>
             <thead>
-              <tr className="border-b border-white/5 bg-white/[0.015] text-left">
-                <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Concert
-                </th>
-
-                <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Organizer
-                </th>
-
-                <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Date & Location
-                </th>
-
-                <th className="px-5 py-4 text-center text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Ticket
-                </th>
-
-                <th className="px-5 py-4 text-right text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Revenue
-                </th>
-
-                <th className="px-5 py-4 text-center text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Status
-                </th>
-
-                <th className="px-5 py-4 text-right text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Action
-                </th>
+              <tr style={{ borderBottom: `1px solid ${THEME.border}`, textAlign: "left", color: THEME.muted, background: "rgba(255,255,255,0.02)" }}>
+                <th style={{ padding: "16px 20px", fontWeight: 600 }}>Concert</th>
+                <th style={{ padding: "16px 20px", fontWeight: 600 }}>Organizer</th>
+                <th style={{ padding: "16px 20px", fontWeight: 600 }}>Date & Location</th>
+                <th style={{ padding: "16px 20px", fontWeight: 600, textAlign: "center" }}>Ticket</th>
+                <th style={{ padding: "16px 20px", fontWeight: 600, textAlign: "right" }}>Revenue</th>
+                <th style={{ padding: "16px 20px", fontWeight: 600, textAlign: "center" }}>Status</th>
+                <th style={{ padding: "16px 20px", fontWeight: 600, textAlign: "right" }}>Action</th>
               </tr>
             </thead>
-
             <tbody>
-              {filteredEvents.length > 0 ? (
-                filteredEvents.map((event) => (
-                  <tr
-                    key={event.id}
-                    className="border-b border-white/5 transition hover:bg-white/[0.02]"
-                  >
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500/20 to-cyan-500/20 text-purple-400">
-                          <CalendarDays size={18} />
-                        </div>
-
-                        <div className="min-w-0">
-                          <p className="max-w-[220px] truncate text-sm font-semibold text-white">
-                            {event.name}
-                          </p>
-
-                          <p className="mt-1 text-[11px] text-slate-600">
-                            ID #{event.id}
-                          </p>
-                        </div>
+              {filtered.map(ev => (
+                <tr key={ev.id} style={{ borderBottom: `1px solid ${THEME.border}` }}>
+                  <td style={{ padding: "16px 20px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(236,72,153,0.1)", display: "flex", alignItems: "center", justifyContent: "center", color: THEME.pink }}>
+                        <CalendarDays size={18} />
                       </div>
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <p className="max-w-[170px] truncate text-xs font-medium text-slate-300">
-                        {event.organizer}
-                      </p>
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-2 text-xs text-slate-400">
-                          <CalendarDays size={13} className="text-slate-600" />
-                          {event.date}
-                        </div>
-
-                        <div className="flex max-w-[220px] items-center gap-2 text-[11px] text-slate-600">
-                          <MapPin size={13} className="shrink-0" />
-                          <span className="truncate">{event.location}</span>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td className="px-5 py-4 text-center">
-                      <div>
-                        <div className="flex items-center justify-center gap-1.5 text-xs font-semibold text-white">
-                          <Ticket size={13} className="text-cyan-400" />
-                          {formatNumber(event.ticketsSold)}
-                        </div>
-
-                        <p className="mt-1 text-[10px] text-slate-600">
-                          / {formatNumber(event.capacity)}
-                        </p>
-                      </div>
-                    </td>
-
-                    <td className="px-5 py-4 text-right">
-                      <p className="text-xs font-semibold text-white">
-                        {formatCurrency(event.revenue)}
-                      </p>
-                    </td>
-
-                    <td className="px-5 py-4 text-center">
-                      <StatusBadge status={event.status} />
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <div className="relative flex justify-end">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setMenuId(
-                              menuId === event.id ? null : event.id
-                            )
-                          }
-                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-slate-400 transition hover:bg-white/5 hover:text-white"
-                        >
-                          <MoreHorizontal size={17} />
-                        </button>
-
-                        {menuId === event.id && (
-                          <>
-                            <button
-                              type="button"
-                              aria-label="Close menu"
-                              onClick={() => setMenuId(null)}
-                              className="fixed inset-0 z-10 cursor-default"
-                            />
-
-                            <div className="absolute right-0 top-11 z-20 w-52 rounded-xl border border-white/10 bg-[#151c2c] p-1.5 shadow-2xl">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedEvent(event);
-                                  setMenuId(null);
-                                }}
-                                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-slate-300 transition hover:bg-white/5 hover:text-white"
-                              >
-                                <Eye size={15} />
-                                Lihat Detail
-                              </button>
-
-                              {event.status === "pending" && (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleAction("approve", event.id)
-                                    }
-                                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-emerald-400 transition hover:bg-emerald-500/10"
-                                  >
-                                    <Check size={15} />
-                                    Approve Concert
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleAction("reject", event.id)
-                                    }
-                                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-rose-400 transition hover:bg-rose-500/10"
-                                  >
-                                    <XCircle size={15} />
-                                    Reject Concert
-                                  </button>
-                                </>
-                              )}
-
-                              {event.status === "published" && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleAction("cancel", event.id)
-                                  }
-                                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-orange-400 transition hover:bg-orange-500/10"
-                                >
-                                  <ShieldAlert size={15} />
-                                  Cancel Concert
-                                </button>
-                              )}
-
-                              {event.status !== "deleted" && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleAction("delete", event.id)
-                                  }
-                                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-slate-400 transition hover:bg-white/5 hover:text-white"
-                                >
-                                  <X size={15} />
-                                  Soft Delete
-                                </button>
-                              )}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="7" className="px-5 py-16 text-center">
-                    <div className="flex flex-col items-center">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/5 text-slate-600">
-                        <CalendarDays size={20} />
-                      </div>
-
-                      <p className="mt-3 text-sm font-medium text-slate-400">
-                        Konser tidak ditemukan
-                      </p>
-
-                      <p className="mt-1 text-xs text-slate-600">
-                        Coba gunakan kata kunci atau filter yang berbeda.
-                      </p>
+                      <p style={{ margin: 0, fontWeight: 600, color: THEME.text, maxWidth: 200, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ev.name}</p>
+                    </div>
+                  </td>
+                  <td style={{ padding: "16px 20px", color: THEME.muted }}>{ev.organizer}</td>
+                  <td style={{ padding: "16px 20px" }}>
+                    <p style={{ margin: 0, color: THEME.text }}>{ev.date}</p>
+                    <p style={{ margin: 0, fontSize: "0.75rem", color: THEME.muted }}>{ev.location}</p>
+                  </td>
+                  <td style={{ padding: "16px 20px", textAlign: "center", color: THEME.text, fontWeight: 600 }}>{formatNumber(ev.ticketsSold)}</td>
+                  <td style={{ padding: "16px 20px", textAlign: "right", color: THEME.success, fontWeight: 600 }}>{formatCurrency(ev.revenue)}</td>
+                  <td style={{ padding: "16px 20px", textAlign: "center" }}><StatusBadge status={ev.status} /></td>
+                  <td style={{ padding: "16px 20px", textAlign: "right" }}>
+                    <div style={{ position: "relative", display: "inline-block" }}>
+                      <button onClick={() => setMenuId(menuId === ev.id ? null : ev.id)} style={{ background: "none", border: `1px solid ${THEME.border}`, borderRadius: 8, padding: "6px 8px", color: THEME.muted, cursor: "pointer" }}>
+                        <MoreHorizontal size={16} />
+                      </button>
+                      {menuId === ev.id && (
+                        <>
+                          <div style={{ position: "fixed", inset: 0, zIndex: 10 }} onClick={() => setMenuId(null)} />
+                          <div style={{ position: "absolute", right: 0, top: 36, background: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 12, padding: 6, zIndex: 20, minWidth: 160, boxShadow: "0 10px 25px rgba(0,0,0,0.5)", textAlign: "left" }}>
+                            <button onClick={() => { setSelected(ev); setMenuId(null); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "10px 12px", background: "none", border: "none", color: THEME.text, fontSize: "0.85rem", cursor: "pointer" }}><Eye size={14} /> Detail</button>
+                            {ev.status === "pending" && (
+                              <>
+                                <button onClick={() => handleAction("approve", ev.id)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "10px 12px", background: "none", border: "none", color: THEME.success, fontSize: "0.85rem", cursor: "pointer" }}><Check size={14} /> Approve</button>
+                                <button onClick={() => handleAction("reject", ev.id)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "10px 12px", background: "none", border: "none", color: THEME.danger, fontSize: "0.85rem", cursor: "pointer" }}><XCircle size={14} /> Reject</button>
+                              </>
+                            )}
+                            {ev.status === "published" && (
+                              <button onClick={() => handleAction("cancel", ev.id)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "10px 12px", background: "none", border: "none", color: THEME.warning, fontSize: "0.85rem", cursor: "pointer" }}><ShieldAlert size={14} /> Cancel</button>
+                            )}
+                          </div>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
-              )}
+              ))}
             </tbody>
           </table>
         </div>
       </div>
-
-      {selectedEvent && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-xl overflow-hidden rounded-2xl border border-white/10 bg-[#101827] shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-              <div>
-                <h2 className="text-base font-semibold text-white">
-                  Detail Concert
-                </h2>
-
-                <p className="mt-1 text-xs text-slate-500">
-                  Informasi konser dan performa penjualan
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setSelectedEvent(null)}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/5 hover:text-white"
-              >
-                <X size={18} />
-              </button>
+      
+      {/* Detail Modal Concerts */}
+      {selected && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ background: THEME.surface, borderRadius: 20, border: `1px solid ${THEME.border}`, maxWidth: 500, width: "100%", padding: 24 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 800 }}>Detail Konser</h3>
+              <button onClick={() => setSelected(null)} style={{ background: "none", border: "none", color: THEME.muted, cursor: "pointer" }}><X size={20} /></button>
             </div>
-
-            <div className="p-5">
-              <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-purple-500/10 text-purple-400">
-                    <CalendarDays size={21} />
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <h3 className="text-sm font-semibold text-white">
-                          {selectedEvent.name}
-                        </h3>
-
-                        <p className="mt-1 text-xs text-slate-500">
-                          {selectedEvent.organizer}
-                        </p>
-                      </div>
-
-                      <StatusBadge status={selectedEvent.status} />
-                    </div>
-                  </div>
-                </div>
+            <div style={{ background: THEME.bg, padding: 16, borderRadius: 12, marginBottom: 16 }}>
+               <h4 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700 }}>{selected.name}</h4>
+               <p style={{ margin: "4px 0 10px", fontSize: "0.85rem", color: THEME.muted }}>{selected.organizer}</p>
+               <StatusBadge status={selected.status} />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+              <div style={{ background: THEME.bg, padding: 16, borderRadius: 12, border: `1px solid ${THEME.border}` }}>
+                <p style={{ margin: 0, fontSize: "0.75rem", color: THEME.muted }}>Tiket Terjual</p>
+                <p style={{ margin: "4px 0 0", fontSize: "1.2rem", fontWeight: 800 }}>{selected.ticketsSold} / {selected.capacity}</p>
               </div>
-
-              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                  <div className="flex items-center gap-2 text-slate-500">
-                    <CalendarDays size={14} />
-                    <span className="text-xs">Tanggal</span>
-                  </div>
-
-                  <p className="mt-2 text-sm font-semibold text-white">
-                    {selectedEvent.date}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                  <div className="flex items-center gap-2 text-slate-500">
-                    <MapPin size={14} />
-                    <span className="text-xs">Lokasi</span>
-                  </div>
-
-                  <p className="mt-2 text-sm font-semibold text-white">
-                    {selectedEvent.location}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                  <div className="flex items-center gap-2 text-slate-500">
-                    <Ticket size={14} />
-                    <span className="text-xs">Ticket Sold</span>
-                  </div>
-
-                  <p className="mt-2 text-sm font-semibold text-white">
-                    {formatNumber(selectedEvent.ticketsSold)} /{" "}
-                    {formatNumber(selectedEvent.capacity)}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                  <div className="flex items-center gap-2 text-slate-500">
-                    <Clock3 size={14} />
-                    <span className="text-xs">Occupancy</span>
-                  </div>
-
-                  <p className="mt-2 text-sm font-semibold text-white">
-                    {selectedEvent.capacity > 0
-                      ? `${Math.round(
-                          (selectedEvent.ticketsSold /
-                            selectedEvent.capacity) *
-                            100
-                        )}%`
-                      : "0%"}
-                  </p>
-                </div>
-
-                <div className="col-span-1 rounded-xl border border-white/5 bg-white/[0.02] p-4 sm:col-span-2">
-                  <p className="text-xs text-slate-500">
-                    Total Revenue
-                  </p>
-
-                  <p className="mt-2 text-xl font-bold text-purple-400">
-                    {formatCurrency(selectedEvent.revenue)}
-                  </p>
-                </div>
+              <div style={{ background: THEME.bg, padding: 16, borderRadius: 12, border: `1px solid ${THEME.border}` }}>
+                <p style={{ margin: 0, fontSize: "0.75rem", color: THEME.muted }}>Pendapatan</p>
+                <p style={{ margin: "4px 0 0", fontSize: "1.2rem", fontWeight: 800, color: THEME.success }}>{formatCurrency(selected.revenue)}</p>
               </div>
-
-              <div className="mt-5 flex flex-wrap gap-2">
-                {selectedEvent.status === "pending" && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        approveEvent(selectedEvent.id);
-                        setSelectedEvent(null);
-                      }}
-                      className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-xs font-bold text-white transition hover:bg-emerald-400"
-                    >
-                      <Check size={15} />
-                      Approve
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        rejectEvent(selectedEvent.id);
-                        setSelectedEvent(null);
-                      }}
-                      className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-rose-500/10 px-4 py-3 text-xs font-bold text-rose-400 transition hover:bg-rose-500/20"
-                    >
-                      <XCircle size={15} />
-                      Reject
-                    </button>
-                  </>
-                )}
-
-                {selectedEvent.status === "published" && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      cancelEvent(selectedEvent.id);
-                      setSelectedEvent(null);
-                    }}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-orange-500/10 px-4 py-3 text-xs font-bold text-orange-400 transition hover:bg-orange-500/20"
-                  >
-                    <ShieldAlert size={15} />
-                    Cancel Concert
-                  </button>
-                )}
-
-                {selectedEvent.status !== "deleted" && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      softDeleteEvent(selectedEvent.id);
-                      setSelectedEvent(null);
-                    }}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-white/5 px-4 py-3 text-xs font-bold text-slate-400 transition hover:bg-white/10 hover:text-white"
-                  >
-                    <X size={15} />
-                    Soft Delete
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedEvent(null)}
-                  className="rounded-xl border border-white/10 px-5 py-3 text-xs font-semibold text-slate-400 transition hover:bg-white/5 hover:text-white"
-                >
-                  Tutup
-                </button>
-              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              {selected.status === "pending" && (
+                <>
+                  <button onClick={() => { approveEvent(selected.id); setSelected(null); }} style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", background: THEME.success, color: "#fff", fontWeight: 700, cursor: "pointer" }}>Approve</button>
+                  <button onClick={() => { rejectEvent(selected.id); setSelected(null); }} style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", background: "rgba(239,68,68,0.1)", color: THEME.danger, fontWeight: 700, cursor: "pointer" }}>Reject</button>
+                </>
+              )}
+              {selected.status === "published" && (
+                <button onClick={() => { cancelEvent(selected.id); setSelected(null); }} style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", background: "rgba(245,158,11,0.1)", color: THEME.warning, fontWeight: 700, cursor: "pointer" }}>Cancel</button>
+              )}
+              <button onClick={() => setSelected(null)} style={{ padding: "12px 20px", borderRadius: 10, border: `1px solid ${THEME.border}`, background: "transparent", color: THEME.muted, fontWeight: 600, cursor: "pointer" }}>Tutup</button>
             </div>
           </div>
         </div>

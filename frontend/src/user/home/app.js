@@ -1,5 +1,3 @@
-// src/user/home/app.js
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../../components/Sidebar';
@@ -10,6 +8,30 @@ import { api } from '../../api';
 
 const HOME_EVENT_LIMIT = 10;
 
+function normalizeEvent(ev) {
+  const ticketTypes = ev.ticket_types || [];
+  const minPrice = ticketTypes.length > 0
+    ? Math.min(...ticketTypes.map((t) => Number(t.price)))
+    : 0;
+  return {
+    ...ev,
+    date: ev.event_date
+      ? new Date(ev.event_date).toLocaleDateString('id-ID', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        })
+      : '-',
+    price: minPrice,
+    category: ev.category?.name || '',
+    tickets: ticketTypes.map((tt) => ({
+      ...tt,
+      price: Number(tt.price),
+      benefits: tt.benefits || [],
+    })),
+  };
+}
+
 export default function Home() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('home');
@@ -17,41 +39,41 @@ export default function Home() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
 
-React.useEffect(() => {
-  const fetchEvents = async () => {
-    try {
-      setLoading(true);
+  React.useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        setLoading(true);
 
-      const data = await api.getFeaturedEvents(
-        HOME_EVENT_LIMIT
-      );
+        const data = await api.getFeaturedEvents(
+          HOME_EVENT_LIMIT
+        );
 
-      setEvents(data);
-    } catch (error) {
-      console.error('Failed to fetch events', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+        setEvents(data.map(normalizeEvent));
+      } catch (error) {
+        console.error('Failed to fetch events', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  fetchEvents();
-
-  const handleDataChanged = () => {
     fetchEvents();
-  };
 
-  window.addEventListener(
-    'auralis:data-changed',
-    handleDataChanged
-  );
+    const handleDataChanged = () => {
+      fetchEvents();
+    };
 
-  return () => {
-    window.removeEventListener(
+    window.addEventListener(
       'auralis:data-changed',
       handleDataChanged
     );
-  };
-}, []);
+
+    return () => {
+      window.removeEventListener(
+        'auralis:data-changed',
+        handleDataChanged
+      );
+    };
+  }, []);
 
   const { toggleFavorite, isFavorite } = useFavorites();
 
@@ -103,7 +125,6 @@ React.useEffect(() => {
           </div>
         ) : (
           <>
-            {/* Featured Hero Banner */}
             {featured && (
               <div
                 className="home-hero"
@@ -124,63 +145,69 @@ React.useEffect(() => {
                   <MapPin size={16} /> {featured.venue} • {featured.date}
                 </p>
                 <button style={{ padding: '10px 20px', borderRadius: '12px', border: 'none', backgroundColor: '#38bdf8', color: '#000', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Ticket size={16} /> Get Tickets Now (${featured.price})
+                  <Ticket size={16} /> Get Tickets Now (Rp{featured.price.toLocaleString('id-ID')})
                 </button>
               </div>
             )}
 
-            {/* Recommended Section — tampil 10 konser (lihat HOME_EVENT_LIMIT) */}
             <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '16px' }}>Recommended For You</h2>
 
-            <div className="events-grid">
-              {events.map((event) => {
-                const favorited = isFavorite(event.id);
-                return (
-                  <div
-                    key={event.id}
-                    onClick={() => navigate(`/detail/${event.id}`)}
-                    style={{
-                      backgroundColor: '#161826',
-                      borderRadius: '16px',
-                      overflow: 'hidden',
-                      border: '1px solid #1e2235',
-                      cursor: 'pointer',
-                      position: 'relative',
-                      transition: 'transform 0.2s'
-                    }}
-                  >
-                    <div style={{ position: 'relative' }}>
-                      <img src={event.image} alt={event.title} style={{ width: '100%', height: '140px', objectFit: 'cover' }} />
+            {events.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 20px', backgroundColor: '#161826', borderRadius: '20px', border: '1px solid #1e2235' }}>
+                <Ticket size={48} color="#6b7280" />
+                <h3>Belum ada event tersedia</h3>
+                <p style={{ color: '#9ca3af' }}>Pantau terus untuk event terbaru.</p>
+              </div>
+            ) : (
+              <div className="events-grid">
+                {events.map((event) => {
+                  const favorited = isFavorite(event.id);
+                  return (
+                    <div
+                      key={event.id}
+                      onClick={() => navigate(`/detail/${event.id}`)}
+                      style={{
+                        backgroundColor: '#161826',
+                        borderRadius: '16px',
+                        overflow: 'hidden',
+                        border: '1px solid #1e2235',
+                        cursor: 'pointer',
+                        position: 'relative',
+                        transition: 'transform 0.2s'
+                      }}
+                    >
+                      <div style={{ position: 'relative' }}>
+                        <img src={event.image} alt={event.title} style={{ width: '100%', height: '140px', objectFit: 'cover' }} />
 
-                      {/* Tombol Heart */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleFavorite(event);
-                        }}
-                        style={{
-                          position: 'absolute', top: '10px', right: '10px',
-                          backgroundColor: 'rgba(11, 12, 16, 0.6)', backdropFilter: 'blur(4px)',
-                          border: 'none', borderRadius: '50%', width: '32px', height: '32px',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 10
-                        }}
-                      >
-                        <Heart size={16} color={favorited ? '#ec4899' : '#fff'} fill={favorited ? '#ec4899' : 'none'} />
-                      </button>
-                    </div>
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            await toggleFavorite(event.id);
+                          }}
+                          style={{
+                            position: 'absolute', top: '10px', right: '10px',
+                            backgroundColor: 'rgba(11, 12, 16, 0.6)', backdropFilter: 'blur(4px)',
+                            border: 'none', borderRadius: '50%', width: '32px', height: '32px',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 10
+                          }}
+                        >
+                          <Heart size={16} color={favorited ? '#ec4899' : '#fff'} fill={favorited ? '#ec4899' : 'none'} />
+                        </button>
+                      </div>
 
-                    <div style={{ padding: '16px' }}>
-                      <h3 style={{ fontSize: '16px', fontWeight: '700', margin: '0 0 4px 0' }}>{event.title}</h3>
-                      <p style={{ color: '#38bdf8', fontSize: '12px', margin: 0 }}>{event.venue} • {event.date}</p>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
-                        <span style={{ fontSize: '16px', fontWeight: '800' }}>${event.price}</span>
+                      <div style={{ padding: '16px' }}>
+                        <h3 style={{ fontSize: '16px', fontWeight: '700', margin: '0 0 4px 0' }}>{event.title}</h3>
+                        <p style={{ color: '#38bdf8', fontSize: '12px', margin: 0 }}>{event.venue} • {event.date}</p>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
+                          <span style={{ fontSize: '16px', fontWeight: '800' }}>Rp{event.price.toLocaleString('id-ID')}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </>
         )}
       </main>

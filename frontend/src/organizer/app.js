@@ -1,13 +1,40 @@
-import React, { useState } from 'react';
-import OrganizerSidebar, { OrganizerMobileToggle } from './components/OrganizerSidebar';
-import { OrganizerProvider } from './context/OrganizerContext';
-import OrganizerDashboard from './dashboard';
-import OrganizerEvents from './events';
-import OrganizerRevenue from './revenue';
-import OrganizerReviews from './reviews';
+import React, { useState, Component } from "react";
+import OrganizerSidebar, {
+  OrganizerMobileToggle,
+} from "./components/OrganizerSidebar";
+import { OrganizerProvider } from "./context/OrganizerContext";
+import OrganizerDashboard from "./dashboard/index";
+import OrganizerEvents from "./events/index";
+import OrganizerRevenue from "./revenue/index";
+import OrganizerReviews from "./reviews/index";
+import OrganizerProfile from "./profile/index";
+import { THEME } from "../theme";
+
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: 40, color: "red", background: "#111", height: "100vh", paddingTop: 100 }}>
+          <h2>Waduh, ada error di halaman ini:</h2>
+          <pre style={{ whiteSpace: "pre-wrap", marginTop: 20 }}>
+            {this.state.error?.toString()}
+          </pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function OrganizerLayout() {
-  const [activePage, setActivePage] = useState('dashboard');
+  const [activePage, setActivePage] = useState("dashboard");
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleNavigate = (page) => {
@@ -16,69 +43,44 @@ function OrganizerLayout() {
   };
 
   const renderPage = () => {
-    if (activePage === 'dashboard') return <OrganizerDashboard />;
-    if (activePage === 'events') return <OrganizerEvents />;
-    if (activePage === 'revenue') return <OrganizerRevenue />;
-    if (activePage === 'reviews') return <OrganizerReviews />;
+    if (activePage === "dashboard") return <OrganizerDashboard />;
+    if (activePage === "events") return <OrganizerEvents />;
+    if (activePage === "revenue") return <OrganizerRevenue />;
+    if (activePage === "reviews") return <OrganizerReviews />;
+    if (activePage === "profile") return <OrganizerProfile />;
     return <OrganizerDashboard />;
   };
 
   return (
     <div
       style={{
-        backgroundColor: '#0f172a',
-        color: '#f8fafc',
-        minHeight: '100vh',
-        fontFamily: 'Inter, sans-serif',
-        display: 'grid',
-        gridTemplateColumns: '260px 1fr'
+        backgroundColor: THEME.bg,
+        color: THEME.text,
+        minHeight: "100vh",
+        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+        display: "flex",
       }}
-      className="organizer-layout"
     >
       <style>{`
-        .organizer-sidebar {
-          width: 260px;
-        }
-        .organizer-sidebar-close,
-        .organizer-sidebar-overlay {
-          display: none;
-        }
-        .organizer-mobile-toggle {
-          display: none;
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 0; background-color: ${THEME.bg}; }
+        
+        .org-main {
+          flex: 1;
+          min-width: 0;
+          padding: 32px;
+          transition: padding-left 0.3s ease;
+          min-height: 100vh;
         }
 
+        /* Untuk Desktop: Beri jarak kiri sebesar lebar sidebar (260px) */
+        @media (min-width: 901px) {
+          .org-main { padding-left: 292px; } /* 260px sidebar + 32px padding */
+        }
+
+        /* Untuk HP/Tablet: Beri jarak atas karena ada tombol menu */
         @media (max-width: 900px) {
-          .organizer-layout {
-            grid-template-columns: 1fr !important;
-          }
-          .organizer-sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            bottom: 0;
-            width: 260px;
-            transform: translateX(-100%);
-            transition: transform 0.25s ease;
-            z-index: 50;
-          }
-          .organizer-sidebar-open {
-            transform: translateX(0);
-          }
-          .organizer-sidebar-close {
-            display: inline-flex !important;
-          }
-          .organizer-sidebar-overlay {
-            display: block !important;
-          }
-          .organizer-mobile-toggle {
-            display: inline-flex !important;
-          }
-        }
-
-        @media (max-width: 520px) {
-          .organizer-content {
-            padding: 16px !important;
-          }
+          .org-main { padding-top: 80px; padding-left: 20px; padding-right: 20px; }
         }
       `}</style>
 
@@ -89,22 +91,17 @@ function OrganizerLayout() {
         onCloseMobile={() => setMobileOpen(false)}
       />
 
-      <main
-        className="organizer-content"
-        style={{
-          padding: 'clamp(16px, 3vw, 32px)',
-          minWidth: 0,
-          overflowX: 'hidden'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+      <main className="org-main">
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
           <OrganizerMobileToggle onOpen={() => setMobileOpen(true)} />
-          <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '600' }}>
-            Panel Organizer
+          <span style={{ fontSize: "0.85rem", color: THEME.muted, fontWeight: 600 }}>
+            Panel Organizer Auralis
           </span>
         </div>
 
-        {renderPage()}
+        <ErrorBoundary>
+          {renderPage()}
+        </ErrorBoundary>
       </main>
     </div>
   );

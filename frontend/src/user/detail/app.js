@@ -1,370 +1,247 @@
-import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import Sidebar from '../../components/Sidebar';
-import Header from '../../components/Header';
-import {
-  Calendar, MapPin, Heart, ArrowLeft, Ticket, Mic2,
-  ShieldCheck, Plus, Minus, ExternalLink, Check, Crown, Loader2
-} from 'lucide-react';
-import { useFavorites } from '../context/FavoriteContext';
-import { api } from '../../api';
+import React, { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { 
+  MapPin, Heart, ArrowLeft, Ticket, Mic2, 
+  Plus, Minus, Loader2, Star, Calendar, ExternalLink
+} from "lucide-react";
+import Sidebar from "../../components/Sidebar";
+import Header from "../../components/Header";
+import { useFavorites } from "../context/FavoriteContext";
+import { useAuth } from "../../context/AuthContext"; 
+import { api } from "../../api/index";
+import { THEME } from "../../theme";
 
 export default function EventDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  const [selectedTicketType, setSelectedTicketType] = useState('regular');
-  const [ticketQuantity, setTicketQuantity] = useState(1);
+  const { user } = useAuth(); 
+
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedTicketType, setSelectedTicketType] = useState(null);
+  const [ticketQuantity, setTicketQuantity] = useState(1);
+  const [reviews, setReviews] = useState([]);
 
   const { toggleFavorite, isFavorite } = useFavorites();
 
-  React.useEffect(() => {
-    const fetchEvent = async () => {
+  useEffect(() => {
+    const fetchData = async () => {
       try {
-        const data = await api.getEventById(id);
-        setEvent(data);
+        setLoading(true);
+        
+        const resEvent = await api.getEventById(id);
+        const normalized = resEvent?.data ?? resEvent;
+        setEvent(normalized);
+        if (normalized?.ticket_types?.length > 0) {
+          setSelectedTicketType(normalized.ticket_types[0].type);
+        }
+
+        const resReviews = await api.getReviewsByEvent(id);
+        setReviews(resReviews?.data || resReviews || []);
+
       } catch (error) {
-        console.error("Failed to fetch event", error);
+        console.error("Failed to fetch data", error);
       } finally {
         setLoading(false);
       }
     };
-    fetchEvent();
+    fetchData();
   }, [id]);
-
-  const responsiveStyles = `
-    .mobile-menu-btn { display: none; }
-    @media (max-width: 768px) {
-      .mobile-menu-btn { display: flex !important; }
-    }
-    .detail-main { padding: 28px; }
-    @media (max-width: 640px) {
-      .detail-main { padding: 16px; }
-    }
-    .detail-hero { height: 340px; }
-    @media (max-width: 640px) {
-      .detail-hero { height: 240px; }
-    }
-    .detail-hero-title { font-size: 36px; }
-    @media (max-width: 640px) {
-      .detail-hero-title { font-size: 24px; }
-    }
-    .detail-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      gap: 28px;
-      align-items: start;
-    }
-    .ticket-panel { position: sticky; top: 28px; }
-    @media (max-width: 900px) {
-      .ticket-panel { position: static; }
-    }
-  `;
 
   if (loading || !event) {
     return (
-      <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#0b0c10', color: '#fff', fontFamily: "'Inter', sans-serif", maxWidth: '100vw', overflowX: 'hidden' }}>
-        <style>{responsiveStyles}</style>
+      <div style={{ display: "flex", minHeight: "100vh", backgroundColor: THEME.bg, color: THEME.text }}>
         <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
           <Header setIsSidebarOpen={setIsSidebarOpen} />
-          <main className="detail-main" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', gap: '12px' }}>
-            <Loader2 size={40} color="#ec4899" style={{ animation: 'spin 1s linear infinite' }} />
-            <span style={{ color: '#9ca3af', fontSize: '15px' }}>Loading event details...</span>
-          </main>
+          <div style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center", flexDirection: "column", gap: 12 }}>
+            <Loader2 size={40} color={THEME.pink} style={{ animation: "spin 1s linear infinite" }} />
+            <span style={{ color: THEME.muted }}>Memuat detail event...</span>
+          </div>
         </div>
       </div>
     );
   }
 
   const favorited = isFavorite(event.id);
-
-  const currentTicket = event.tickets.find(t => t.type === selectedTicketType) || event.tickets[0];
-  const totalPrice = currentTicket.price * ticketQuantity;
+  const currentTicket = event.ticket_types?.find((t) => t.type === selectedTicketType) || event.ticket_types?.[0];
+  const totalPrice = currentTicket ? Number(currentTicket.price) * ticketQuantity : 0;
 
   const handleCheckout = () => {
-    navigate('/checkout', {
+    if (!currentTicket) return;
+
+    if (!user) {
+      navigate("/login", { 
+        state: { redirectAfterLogin: `/detail/${id}` } 
+      });
+      return;
+    }
+
+    navigate("/checkout", {
       state: {
-        event,
-        ticketType: currentTicket,
-        quantity: ticketQuantity,
-        totalPrice
-      }
+        item: {
+          event_id: event.id,
+          event_title: event.title,
+          ticket_type_id: currentTicket.id,
+          ticket_type_name: currentTicket.name,
+          price: currentTicket.price,
+          quantity: ticketQuantity,
+        },
+      },
     });
   };
 
-  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${event.lat},${event.lng}`;
-  const bboxOffset = 0.01;
-  const mapBbox = `${event.lng - bboxOffset}%2C${event.lat - bboxOffset}%2C${event.lng + bboxOffset}%2C${event.lat + bboxOffset}`;
-  const mapEmbedUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${mapBbox}&layer=mapnik&marker=${event.lat}%2C${event.lng}`;
+  const mapBbox = event.latitude && event.longitude 
+    ? `${event.longitude - 0.01}%2C${event.latitude - 0.01}%2C${event.longitude + 0.01}%2C${event.latitude + 0.01}` 
+    : null;
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#0b0c10', color: '#fff', fontFamily: "'Inter', sans-serif", maxWidth: '100vw', overflowX: 'hidden' }}>
-      <style>{responsiveStyles}</style>
+    <div style={{ display: "flex", minHeight: "100vh", backgroundColor: THEME.bg, color: THEME.text }}>
       <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
-
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         <Header setIsSidebarOpen={setIsSidebarOpen} />
 
-        <main className="detail-main" style={{ flex: 1, overflowY: 'auto' }}>
-
-          <button
-            onClick={() => navigate(-1)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none',
-              color: '#9ca3af', fontSize: '14px', cursor: 'pointer', marginBottom: '20px', padding: 0
-            }}
-          >
+        <main style={{ padding: "clamp(16px, 3vw, 32px)", flex: 1, overflowY: "auto" }}>
+          
+          <button onClick={() => navigate(-1)} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", color: THEME.muted, fontSize: "0.9rem", cursor: "pointer", marginBottom: 20 }}>
             <ArrowLeft size={18} /> Kembali
           </button>
 
-          <div className="detail-hero" style={{
-            borderRadius: '24px', overflow: 'hidden', position: 'relative',
-            marginBottom: '28px', border: '1px solid #1e2235'
-          }}>
-            <img src={event.image} alt={event.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            <div style={{
-              position: 'absolute', inset: 0,
-              background: 'linear-gradient(180deg, rgba(11,12,16,0) 20%, rgba(11,12,16,0.95) 100%)'
-            }} />
-
-            <button
-              onClick={() => toggleFavorite(event)}
-              style={{
-                position: 'absolute', top: '16px', right: '16px',
-                backgroundColor: 'rgba(11, 12, 16, 0.7)', backdropFilter: 'blur(4px)',
-                border: 'none', borderRadius: '50%', width: '40px', height: '40px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 10
-              }}
-            >
-              <Heart size={20} color={favorited ? '#ec4899' : '#fff'} fill={favorited ? '#ec4899' : 'none'} />
+          {/* Hero Image */}
+          <div style={{ borderRadius: 24, overflow: "hidden", position: "relative", height: "clamp(240px, 40vw, 340px)", marginBottom: 28, border: `1px solid ${THEME.border}` }}>
+            <img src={event.image} alt={event.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(11,12,16,0) 20%, rgba(11,12,16,0.95) 100%)" }} />
+            <button onClick={() => toggleFavorite(event.id)} style={{ position: "absolute", top: 16, right: 16, backgroundColor: "rgba(11,12,16,0.7)", border: "none", borderRadius: "50%", width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+              <Heart size={20} color={favorited ? THEME.pink : "#fff"} fill={favorited ? THEME.pink : "none"} />
             </button>
-
-            <div style={{ position: 'absolute', bottom: '20px', left: '24px', right: '24px' }}>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
-                <span style={{
-                  backgroundColor: '#ec4899', color: '#fff',
-                  fontSize: '11px', fontWeight: '800', padding: '4px 12px', borderRadius: '12px'
-                }}>
-                  {event.tag}
-                </span>
-                <span style={{
-                  backgroundColor: '#282c42', color: '#fff',
-                  fontSize: '11px', fontWeight: '800', padding: '4px 12px', borderRadius: '12px'
-                }}>
-                  {event.secondaryTag}
-                </span>
-              </div>
-              <h1 className="detail-hero-title" style={{ fontWeight: '900', margin: '0 0 6px 0', letterSpacing: '-0.5px' }}>
-                {event.title.toUpperCase()}
-              </h1>
-              <p style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#f0abfc', fontSize: '14px', fontWeight: '700', margin: '0 0 12px 0' }}>
+            <div style={{ position: "absolute", bottom: 24, left: 24, right: 24 }}>
+              <h1 style={{ fontWeight: 900, margin: "0 0 6px", fontSize: "clamp(1.5rem, 4vw, 2.2rem)" }}>{event.title.toUpperCase()}</h1>
+              <p style={{ display: "flex", alignItems: "center", gap: 6, color: THEME.pink, fontSize: "0.9rem", fontWeight: 700, margin: "0 0 12px" }}>
                 <Mic2 size={15} /> {event.artist}
               </p>
-              <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#e5e7eb', fontSize: '14px' }}>
-                  <Calendar size={16} color="#38bdf8" />
-                  <span>{event.date}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#e5e7eb', fontSize: '14px' }}>
-                  <MapPin size={16} color="#38bdf8" />
-                  <span>{event.venue.toUpperCase()}</span>
-                </div>
-              </div>
             </div>
           </div>
 
-          <div className="detail-grid">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 28, alignItems: "start" }}>
+            
+            {/* Kolom Kiri: Info & Ulasan */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              
+              <div style={{ backgroundColor: THEME.surface, borderRadius: 20, padding: 24, border: `1px solid ${THEME.border}` }}>
+                <h3 style={{ fontSize: "1.1rem", fontWeight: 800, margin: "0 0 12px", color: THEME.pink }}>Tentang Acara</h3>
+                <p style={{ color: THEME.muted, fontSize: "0.9rem", lineHeight: 1.7, margin: 0 }}>{event.description}</p>
+              </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-
-              <div style={{
-                backgroundColor: '#161826', borderRadius: '20px', padding: '24px', border: '1px solid #1e2235'
-              }}>
-                <h3 style={{ fontSize: '18px', fontWeight: '800', margin: '0 0 12px 0', color: '#ec4899' }}>
-                  Tentang Acara
+              {/* --- LOKASI & PETA --- */}
+              <div style={{ backgroundColor: THEME.surface, borderRadius: 20, padding: 24, border: `1px solid ${THEME.border}` }}>
+                <h3 style={{ fontSize: "1.1rem", fontWeight: 800, margin: "0 0 16px", color: THEME.pink, display: "flex", alignItems: "center", gap: 8 }}>
+                  <MapPin size={18} /> Lokasi Acara
                 </h3>
-                <p style={{ color: '#9ca3af', fontSize: '14px', lineHeight: '1.7', margin: '0 0 20px 0' }}>
-                  {event.description}
+                
+                <p style={{ color: THEME.text, fontWeight: 700, marginBottom: 4, fontSize: "1rem" }}>{event.venue}</p>
+                <p style={{ color: THEME.muted, fontSize: "0.9rem", marginBottom: 16, lineHeight: 1.5 }}>
+                  {event.address || "-"}, {event.city}
                 </p>
 
-                <div style={{ display: 'flex', gap: '28px', flexWrap: 'wrap', paddingTop: '12px', borderTop: '1px dashed #282c42' }}>
-                  <div>
-                    <div style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
-                      Pintu Dibuka
-                    </div>
-                    <div style={{ fontSize: '15px', fontWeight: '800' }}>{event.doorsOpen}</div>
+                {mapBbox && (
+                  <div style={{ borderRadius: 16, overflow: "hidden", height: 250, border: `1px solid ${THEME.border}` }}>
+                    <iframe
+                      title="Peta Lokasi"
+                      width="100%"
+                      height="100%"
+                      frameBorder="0"
+                      scrolling="no"
+                      src={`https://www.openstreetmap.org/export/embed.html?bbox=${mapBbox}&layer=mapnik&marker=${event.latitude}%2C${event.longitude}`}
+                      style={{ border: 0, filter: "invert(90%) hue-rotate(180deg) contrast(90%)" }}
+                    />
                   </div>
-                  <div>
-                    <div style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
-                      Acara Mulai
-                    </div>
-                    <div style={{ fontSize: '15px', fontWeight: '800' }}>{event.showStarts}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
-                      Batas Usia
-                    </div>
-                    <div style={{ fontSize: '15px', fontWeight: '800' }}>{event.ageLimit}</div>
-                  </div>
-                </div>
-              </div>
+                )}
 
-              <div style={{
-                backgroundColor: '#161826', borderRadius: '20px', padding: '24px', border: '1px solid #1e2235'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-                  <h3 style={{ fontSize: '18px', fontWeight: '800', margin: 0, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <MapPin size={20} /> Lokasi Acara
-                  </h3>
-                  <a
-                    href={directionsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      display: 'inline-flex', alignItems: 'center', gap: '6px',
-                      color: '#38bdf8', fontSize: '12px', fontWeight: '700', textDecoration: 'none',
-                      backgroundColor: 'rgba(56, 189, 248, 0.1)', padding: '6px 12px', borderRadius: '8px'
-                    }}
+                {event.latitude && event.longitude && (
+                  <a 
+                    href={`https://www.google.com/maps/search/?api=1&query=${event.latitude},${event.longitude}`} 
+                    target="_blank" 
+                    rel="noreferrer"
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 16, color: THEME.purple, fontSize: "0.85rem", fontWeight: 700, textDecoration: "none" }}
                   >
-                    Lihat Rute <ExternalLink size={14} />
+                    Buka di Google Maps <ExternalLink size={14} />
                   </a>
+                )}
+              </div>
+              {/* --------------------- */}
+
+              {/* Ulasan */}
+              <div style={{ backgroundColor: THEME.surface, borderRadius: 20, padding: 24, border: `1px solid ${THEME.border}` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                  <h3 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+                    <Star color={THEME.warning} fill={THEME.warning} /> Ulasan ({reviews.length})
+                  </h3>
                 </div>
 
-                <div style={{
-                  borderRadius: '14px', overflow: 'hidden', height: '220px', marginBottom: '16px',
-                  border: '1px solid #282c42'
-                }}>
-                  <iframe
-                    title={`Peta lokasi ${event.venue}`}
-                    src={mapEmbedUrl}
-                    style={{ width: '100%', height: '100%', border: 0, filter: 'invert(90%) hue-rotate(180deg) contrast(90%)' }}
-                    loading="lazy"
-                  />
-                </div>
-
-                <div style={{ fontSize: '16px', fontWeight: '800', marginBottom: '4px' }}>
-                  {event.venue}
-                </div>
-                <div style={{ fontSize: '13px', color: '#9ca3af', lineHeight: '1.5' }}>
-                  {event.address}
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  {reviews.length === 0 ? (
+                    <p style={{ color: THEME.dim, fontSize: "0.9rem", margin: 0, textAlign: "center", padding: "20px 0" }}>Belum ada ulasan.</p>
+                  ) : (
+                    reviews.map((rv) => (
+                      <div key={rv.id} style={{ borderBottom: `1px solid ${THEME.border}`, paddingBottom: 16 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                          <strong style={{ color: THEME.text, fontSize: "0.9rem" }}>{rv.user?.name || "Anonim"}</strong>
+                          <div style={{ display: "flex" }}>
+                            {[...Array(5)].map((_, i) => (
+                              <Star key={i} size={14} color={i < rv.rating ? THEME.warning : THEME.border} fill={i < rv.rating ? THEME.warning : "none"} />
+                            ))}
+                          </div>
+                        </div>
+                        <p style={{ margin: 0, color: THEME.muted, fontSize: "0.85rem" }}>"{rv.comment}"</p>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
-
             </div>
 
-            <div className="ticket-panel" style={{
-              backgroundColor: '#161826', borderRadius: '24px', padding: '28px', border: '1px solid #282c42'
-            }}>
-              <h3 style={{ fontSize: '20px', fontWeight: '800', margin: '0 0 16px 0' }}>Beli Tiket</h3>
-
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ fontSize: '12px', fontWeight: '700', color: '#9ca3af', display: 'block', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Pilih Kategori Tiket
-                </label>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {event.tickets.map((t) => {
-                    const isSelected = selectedTicketType === t.type;
-                    const isVIP = t.type === 'vip';
-
-                    return (
-                      <div
-                        key={t.type}
-                        onClick={() => setSelectedTicketType(t.type)}
-                        style={{
-                          padding: '16px', borderRadius: '16px', cursor: 'pointer',
-                          border: isSelected
-                            ? (isVIP ? '2px solid #eab308' : '2px solid #38bdf8')
-                            : '1px solid #282c42',
-                          backgroundColor: isSelected
-                            ? (isVIP ? 'rgba(234, 179, 8, 0.08)' : 'rgba(56, 189, 248, 0.08)')
-                            : '#11131f',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {isVIP ? <Crown size={18} color="#eab308" /> : <Ticket size={18} color="#38bdf8" />}
-                            <span style={{ fontWeight: '800', fontSize: '15px' }}>{t.name}</span>
-                          </div>
-                          <span style={{ fontSize: '18px', fontWeight: '900', color: isVIP ? '#eab308' : '#38bdf8' }}>
-                            ${t.price}
-                          </span>
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px' }}>
-                          {t.benefits.map((benefit, idx) => (
-                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#9ca3af' }}>
-                              <Check size={14} color={isSelected ? (isVIP ? '#eab308' : '#38bdf8') : '#6b7280'} />
-                              <span>{benefit}</span>
-                            </div>
-                          ))}
-                        </div>
+            {/* Kolom Kanan: Beli Tiket */}
+            <div style={{ backgroundColor: THEME.surface, borderRadius: 24, padding: 28, border: `1px solid ${THEME.border}`, position: "sticky", top: 24 }}>
+              <h3 style={{ fontSize: "1.2rem", fontWeight: 800, margin: "0 0 16px" }}>Beli Tiket</h3>
+              
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontSize: "0.8rem", fontWeight: 700, color: THEME.muted, display: "block", marginBottom: 10 }}>Pilih Kategori</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {event.ticket_types?.map((t) => (
+                    <div key={t.id} onClick={() => setSelectedTicketType(t.type)} style={{ padding: 16, borderRadius: 12, cursor: "pointer", border: selectedTicketType === t.type ? `2px solid ${THEME.pink}` : `1px solid ${THEME.border}`, backgroundColor: selectedTicketType === t.type ? "rgba(236,72,153,0.05)" : THEME.bg }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                        <span style={{ fontWeight: 800 }}>{t.name}</span>
+                        <span style={{ fontSize: "1rem", fontWeight: 900, color: THEME.pink }}>Rp{Number(t.price).toLocaleString("id-ID")}</span>
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              <hr style={{ borderColor: '#1e2235', margin: '0 0 20px 0' }} />
+              <hr style={{ borderColor: THEME.border, margin: "20px 0" }} />
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '10px' }}>
-                <div>
-                  <span style={{ fontSize: '14px', fontWeight: '700', display: 'block' }}>Jumlah Tiket</span>
-                  <span style={{ fontSize: '11px', color: '#6b7280' }}>Maks. 5 tiket per akun</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', backgroundColor: '#11131f', padding: '6px 14px', borderRadius: '12px', border: '1px solid #282c42' }}>
-                  <button
-                    onClick={() => setTicketQuantity(Math.max(1, ticketQuantity - 1))}
-                    style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                  >
-                    <Minus size={16} />
-                  </button>
-                  <span style={{ fontWeight: '800', minWidth: '20px', textAlign: 'center', fontSize: '15px' }}>{ticketQuantity}</span>
-                  <button
-                    onClick={() => setTicketQuantity(Math.min(5, ticketQuantity + 1))}
-                    style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                  >
-                    <Plus size={16} />
-                  </button>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                <span style={{ fontSize: "0.9rem", fontWeight: 700 }}>Jumlah</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, background: THEME.bg, padding: "6px 14px", borderRadius: 10, border: `1px solid ${THEME.border}` }}>
+                  <button onClick={() => setTicketQuantity(Math.max(1, ticketQuantity - 1))} style={{ background: "none", border: "none", color: THEME.text, cursor: "pointer" }}><Minus size={16} /></button>
+                  <span style={{ fontWeight: 800, minWidth: 20, textAlign: "center" }}>{ticketQuantity}</span>
+                  <button onClick={() => setTicketQuantity(Math.min(10, ticketQuantity + 1))} style={{ background: "none", border: "none", color: THEME.text, cursor: "pointer" }}><Plus size={16} /></button>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                <span style={{ fontSize: '14px', color: '#9ca3af' }}>Total Pembayaran</span>
-                <span style={{ fontSize: '28px', fontWeight: '900', color: '#fff' }}>${totalPrice}</span>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+                <span style={{ fontSize: "0.9rem", color: THEME.muted }}>Total</span>
+                <span style={{ fontSize: "1.4rem", fontWeight: 900 }}>Rp{totalPrice.toLocaleString("id-ID")}</span>
               </div>
 
-              <button
-                onClick={handleCheckout}
-                style={{
-                  width: '100%', padding: '14px', borderRadius: '14px', border: 'none',
-                  background: selectedTicketType === 'vip'
-                    ? 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)'
-                    : 'linear-gradient(135deg, #38bdf8 0%, #0284c7 100%)',
-                  color: selectedTicketType === 'vip' ? '#000' : '#fff',
-                  fontWeight: '800', fontSize: '15px', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                  boxShadow: selectedTicketType === 'vip'
-                    ? '0 4px 15px rgba(234, 179, 8, 0.3)'
-                    : '0 4px 15px rgba(2, 132, 199, 0.4)',
-                  marginBottom: '16px', transition: 'all 0.2s ease'
-                }}
-              >
-                <Ticket size={18} /> Lanjutkan Ke Checkout
+              <button onClick={handleCheckout} style={{ width: "100%", padding: 14, borderRadius: 12, border: "none", background: THEME.gradient, color: "#fff", fontWeight: 800, fontSize: "0.95rem", cursor: "pointer", boxShadow: "0 4px 15px rgba(236, 72, 153, 0.3)" }}>
+                {user ? "Lanjut ke Pembayaran" : "Login untuk Membeli"}
               </button>
-
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#6b7280', fontSize: '12px' }}>
-                <ShieldCheck size={16} color="#10b981" /> Tiket dijamin 100% Asli & Resmi
-              </div>
             </div>
 
           </div>
-
         </main>
       </div>
     </div>

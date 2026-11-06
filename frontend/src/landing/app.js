@@ -1,576 +1,846 @@
-// src/landing/app.js
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  Building2, User, Ticket, QrCode, BarChart3, ShieldCheck,
-  MapPin, Calendar, ArrowRight, CheckCircle2, ChevronRight,
-  X, Mail, Lock, Phone, Sparkles, Music, Zap, LogIn, LogOut, Check, Loader2
-} from 'lucide-react';
-import { api } from '../api';
+  Building2,
+  Ticket,
+  QrCode,
+  BarChart3,
+  MapPin,
+  Calendar,
+  CheckCircle2,
+  Sparkles,
+  Zap,
+  Loader2,
+  ArrowRight,
+  Menu,
+  X,
+} from "lucide-react";
+import { api } from "../api/index";
+import { THEME } from "../theme";
 
 const LANDING_EVENT_LIMIT = 10;
-const CATEGORY_BADGE_COLOR = {
-  Concert: '#ec4899',
-  Festival: '#a855f7',
-  Acoustic: '#10b981',
-  EDM: '#f43f5e',
-  Indie: '#38bdf8',
-  Jazz: '#eab308',
-  Pop: '#ec4899',
-  Rock: '#f97316'
-};
 
 export default function AuralisPortal() {
-  // Authentication State Simulation
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
+  const navigate = useNavigate();
 
-  // Event Data (dari api bersama)
   const [events, setEvents] = useState([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Modal & Selection States
-  const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [activeRoleTab, setActiveRoleTab] = useState('user'); // 'user' | 'organizer'
-  const [selectedConcert, setSelectedConcert] = useState(null);
+  useEffect(() => {
+    let mounted = true;
 
-  // Form States
-  const [userForm, setUserForm] = useState({ fullName: '', email: '', phone: '', password: '' });
-  const [organizerForm, setOrganizerForm] = useState({
-    orgName: '', venueName: '', venueType: 'Concert Hall / Arena', picName: '', businessEmail: '', phone: '', capacity: ''
-  });
+    const fetchEvents = async () => {
+      try {
+        setLoadingEvents(true);
+        const data = await api.getFeaturedEvents(LANDING_EVENT_LIMIT);
+        if (mounted) setEvents(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("Gagal memuat event:", err);
+      } finally {
+        if (mounted) setLoadingEvents(false);
+      }
+    };
 
-useEffect(() => {
-  const fetchEvents = async () => {
-    try {
-      setLoadingEvents(true);
-
-      const data = await api.getFeaturedEvents(
-        LANDING_EVENT_LIMIT
-      );
-
-      setEvents(data);
-    } catch (error) {
-      console.error('Failed to fetch events', error);
-    } finally {
-      setLoadingEvents(false);
-    }
-  };
-
-  fetchEvents();
-
-  const handleDataChanged = () => {
     fetchEvents();
-  };
 
-  window.addEventListener(
-    'auralis:data-changed',
-    handleDataChanged
-  );
+    const handleDataChanged = () => fetchEvents();
+    window.addEventListener("auralis:data-changed", handleDataChanged);
 
-  return () => {
-    window.removeEventListener(
-      'auralis:data-changed',
-      handleDataChanged
-    );
-  };
-}, []);
+    return () => {
+      mounted = false;
+      window.removeEventListener("auralis:data-changed", handleDataChanged);
+    };
+  }, []);
 
-  // Intercept Booking Action
-  const handleBookingClick = (eventItem) => {
-    if (!isLoggedIn) {
-      setSelectedConcert(eventItem);
-      setActiveRoleTab('user');
-      setAuthModalOpen(true);
-    } else {
-      alert(`Berhasil! Kamu akan masuk ke halaman pembayaran tiket untuk: ${eventItem.title}`);
-    }
-  };
+  const goLogin = () => navigate("/login");
+  const goRegister = () => navigate("/register");
 
-  // Submit Handler Registration User
-  const handleUserSubmit = (e) => {
-    e.preventDefault();
-    setIsLoggedIn(true);
-    setCurrentUser({ name: userForm.fullName, email: userForm.email });
-    setAuthModalOpen(false);
-
-    if (selectedConcert) {
-      alert(`Registrasi Berhasil! Selamat datang ${userForm.fullName}. Lanjutkan pemesanan tiket ${selectedConcert.title}.`);
-    } else {
-      alert(`Registrasi Berhasil! Selamat datang, ${userForm.fullName}.`);
-    }
-  };
-
-  // Submit Handler Organizer
-  const handleOrganizerSubmit = (e) => {
-    e.preventDefault();
-    alert(`Permohonan Kemitraan Venue "${organizerForm.venueName}" dikirim! Tim Business Development kami akan menghubungi Anda.`);
-    setAuthModalOpen(false);
-  };
-
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    setCurrentUser(null);
-    setSelectedConcert(null);
+  // UBAH DI SINI: Tombol Pesan Tiket langsung ke halaman Detail, BUKAN ke Login
+  const handleBooking = (eventItem) => {
+    navigate(`/detail/${eventItem.id}`);
   };
 
   return (
-    <div style={{ backgroundColor: '#0f172a', color: '#f8fafc', minHeight: '100vh', fontFamily: 'Inter, sans-serif' }}>
-
+    <div
+      style={{
+        minHeight: "100vh",
+        backgroundColor: THEME.bg,
+        color: THEME.text,
+        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+        overflowX: "hidden",
+      }}
+    >
       <style>{`
-        .active-tab {
-          background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
-          color: #fff !important;
-          box-shadow: 0 4px 15px rgba(99, 102, 241, 0.35);
-        }
-        .card-hover {
-          transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
-        }
-        .card-hover:hover {
-          transform: translateY(-6px);
-          border-color: rgba(168, 85, 247, 0.5) !important;
-          box-shadow: 0 16px 32px rgba(0, 0, 0, 0.5);
-        }
-        .btn-gradient {
-          background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+        * { box-sizing: border-box; }
+        .aur-btn-gradient {
+          background: ${THEME.gradient};
           color: #fff;
-          transition: all 0.25s ease;
+          transition: opacity .2s ease, transform .2s ease, box-shadow .2s ease;
         }
-        .btn-gradient:hover {
-          opacity: 0.92;
+        .aur-btn-gradient:hover {
+          opacity: .92;
           transform: translateY(-2px);
-          box-shadow: 0 8px 25px rgba(168, 85, 247, 0.4);
+          box-shadow: 0 10px 25px rgba(236,72,153,0.35);
+        }
+        .aur-card-hover {
+          transition: transform .3s ease, border-color .3s ease, box-shadow .3s ease;
+        }
+        .aur-card-hover:hover {
+          transform: translateY(-6px);
+          border-color: rgba(236,72,153,0.45) !important;
+          box-shadow: 0 16px 32px rgba(236,72,153,0.15);
+        }
+        .aur-nav-links { display: flex; }
+        .aur-mobile-menu-btn { display: none; }
+        .aur-hero { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+        .aur-events-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+          gap: 24px;
+        }
+        .aur-solutions-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+          gap: 24px;
+        }
+
+        @media (max-width: 900px) {
+          .aur-nav-links { display: none !important; }
+          .aur-mobile-menu-btn { display: flex !important; }
+        }
+        @media (max-width: 640px) {
+          .aur-hero { grid-template-columns: 1fr; }
+          .aur-events-grid { grid-template-columns: 1fr; gap: 16px; }
+          .aur-solutions-grid { grid-template-columns: 1fr; gap: 16px; }
+        }
+        @media (max-width: 480px) {
+          .aur-hero-title { font-size: 1.75rem !important; }
         }
       `}</style>
 
-      {/* NAVBAR */}
-      <nav style={{ position: 'sticky', top: 0, zIndex: 40, backgroundColor: 'rgba(15, 23, 42, 0.92)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-        <div style={{ maxWidth: '1240px', margin: '0 auto', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-
-          {/* Logo */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-            <div style={{ padding: '8px 10px', background: 'linear-gradient(135deg, #6366f1, #a855f7)', borderRadius: '12px' }}>
-              <Ticket size={22} color="#fff" />
+      <nav
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 50,
+          backgroundColor: "rgba(11,12,16,0.92)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          borderBottom: `1px solid ${THEME.border}`,
+        }}
+      >
+        <div
+          style={{
+            maxWidth: 1240,
+            margin: "0 auto",
+            padding: "14px 20px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 16,
+          }}
+        >
+          <div
+            onClick={() => navigate("/")}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+          >
+            <div
+              style={{
+                padding: "8px 10px",
+                background: THEME.gradient,
+                borderRadius: 12,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Ticket size={20} color="#fff" />
             </div>
-            <span style={{ fontSize: '1.4rem', fontWeight: '900', letterSpacing: '-0.5px' }}>
-              Aur<span style={{ color: '#a855f7' }}>alis</span>
+            <span
+              style={{
+                fontSize: "1.35rem",
+                fontWeight: 900,
+                letterSpacing: "-0.5px",
+                color: THEME.text,
+              }}
+            >
+              Aur<span style={{ color: THEME.pink }}>alis</span>
             </span>
           </div>
 
-          {/* Links */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '28px', fontSize: '0.92rem', fontWeight: '500' }}>
-            <a href="#concert-list" style={{ color: '#cbd5e1', textDecoration: 'none' }}>Jadwal Konser</a>
-            <a href="#venue-solutions" style={{ color: '#cbd5e1', textDecoration: 'none' }}>Solusi Venue & Organizer</a>
-          </div>
-
-          {/* User Auth Action */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            {isLoggedIn ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontSize: '0.88rem', color: '#38bdf8', fontWeight: '600' }}>
-                  👋 Halo, {currentUser?.name}
-                </span>
-                <button
-                  onClick={handleLogout}
-                  style={{ padding: '8px 14px', backgroundColor: '#334155', border: 'none', color: '#f1f5f9', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-                >
-                  <LogOut size={15} /> Keluar
-                </button>
-              </div>
-            ) : (
-              <>
-                <button
-                  onClick={() => { setSelectedConcert(null); setActiveRoleTab('user'); setAuthModalOpen(true); }}
-                  style={{ padding: '9px 18px', backgroundColor: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: '10px', fontWeight: '600', cursor: 'pointer', fontSize: '0.88rem' }}
-                >
-                  Masuk / Daftar User
-                </button>
-                <button
-                  onClick={() => { setSelectedConcert(null); setActiveRoleTab('organizer'); setAuthModalOpen(true); }}
-                  className="btn-gradient"
-                  style={{ padding: '10px 20px', border: 'none', borderRadius: '10px', fontWeight: '700', cursor: 'pointer', fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '8px' }}
-                >
-                  <Building2 size={16} /> Daftar Mitra Venue
-                </button>
-              </>
-            )}
-          </div>
-
-        </div>
-      </nav>
-
-      {/* HERO SECTION */}
-      <section style={{ maxWidth: '1240px', margin: '40px auto 60px', padding: '0 24px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '40px', alignItems: 'center' }}>
-        <div>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 14px', borderRadius: '20px', backgroundColor: 'rgba(168, 85, 247, 0.15)', border: '1px solid rgba(168, 85, 247, 0.3)', color: '#c084fc', fontSize: '0.82rem', fontWeight: '700', marginBottom: '20px' }}>
-            <Sparkles size={15} /> AURALIS TICKETING & VENUE ECOSYSTEM
-          </div>
-
-          <h1 style={{ fontSize: 'clamp(2.2rem, 4.2vw, 3.5rem)', fontWeight: '900', lineHeight: 1.15, marginBottom: '20px', letterSpacing: '-1px' }}>
-            Pesan Tiket Konser atau <br />
-            <span style={{ background: 'linear-gradient(135deg, #818cf8, #c084fc)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              Daftarkan Organisasi & Venue
-            </span>
-          </h1>
-
-          <p style={{ color: '#94a3b8', fontSize: '1.02rem', lineHeight: 1.6, marginBottom: '32px', maxWidth: '520px' }}>
-            Dapatkan e-ticket instan untuk konser musik favoritmu. Jika kamu pengelola venue atau EO, daftarkan tempatmu untuk sistem *gate scanner* & laporan otomatis.
-          </p>
-
-          <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+          <div
+            className="aur-nav-links"
+            style={{
+              alignItems: "center",
+              gap: 28,
+              fontSize: "0.9rem",
+              fontWeight: 500,
+            }}
+          >
             <a
               href="#concert-list"
-              className="btn-gradient"
-              style={{ padding: '14px 28px', borderRadius: '12px', textDecoration: 'none', fontSize: '0.95rem', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+              style={{ color: THEME.muted, textDecoration: "none" }}
             >
-              <Ticket size={18} /> Lihat Daftar Konser
+              Jadwal Konser
             </a>
+            <a
+              href="#venue-solutions"
+              style={{ color: THEME.muted, textDecoration: "none" }}
+            >
+              Solusi Venue
+            </a>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <button
+              onClick={goLogin}
+              style={{
+                padding: "9px 16px",
+                backgroundColor: "transparent",
+                border: `1px solid ${THEME.borderStrong}`,
+                color: THEME.text,
+                borderRadius: 10,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontSize: "0.85rem",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Masuk
+            </button>
+            <button
+              onClick={goRegister}
+              className="aur-btn-gradient"
+              style={{
+                padding: "10px 16px",
+                border: "none",
+                borderRadius: 10,
+                fontWeight: 700,
+                cursor: "pointer",
+                fontSize: "0.85rem",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                whiteSpace: "nowrap",
+              }}
+            >
+              <Building2 size={14} />
+              <span>Daftar</span>
+            </button>
 
             <button
-              onClick={() => { setSelectedConcert(null); setActiveRoleTab('organizer'); setAuthModalOpen(true); }}
-              style={{ padding: '14px 28px', borderRadius: '12px', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.95rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+              onClick={() => setMobileMenuOpen((v) => !v)}
+              className="aur-mobile-menu-btn"
+              aria-label="Menu"
+              style={{
+                width: 40,
+                height: 40,
+                alignItems: "center",
+                justifyContent: "center",
+                background: "transparent",
+                border: `1px solid ${THEME.borderStrong}`,
+                borderRadius: 10,
+                color: THEME.text,
+                cursor: "pointer",
+              }}
             >
-              <Building2 size={18} color="#c084fc" /> Registrasi Venue (B2B)
+              {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
             </button>
           </div>
         </div>
 
-        {/* Hero Quick Banner */}
-        <div style={{ backgroundColor: '#1e293b', borderRadius: '24px', padding: '32px', border: '1px solid rgba(255,255,255,0.1)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-            <Zap color="#f43f5e" size={24} />
-            <h3 style={{ fontSize: '1.2rem', fontWeight: '800' }}>Alur Pemesanan Cepat & Aman</h3>
+        {mobileMenuOpen && (
+          <div
+            style={{
+              borderTop: `1px solid ${THEME.border}`,
+              padding: "12px 20px 16px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+            }}
+          >
+            <a
+              href="#concert-list"
+              onClick={() => setMobileMenuOpen(false)}
+              style={{
+                color: THEME.muted,
+                textDecoration: "none",
+                padding: "10px 0",
+                fontSize: "0.9rem",
+              }}
+            >
+              Jadwal Konser
+            </a>
+            <a
+              href="#venue-solutions"
+              onClick={() => setMobileMenuOpen(false)}
+              style={{
+                color: THEME.muted,
+                textDecoration: "none",
+                padding: "10px 0",
+                fontSize: "0.9rem",
+              }}
+            >
+              Solusi Venue
+            </a>
           </div>
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '14px', color: '#cbd5e1', fontSize: '0.9rem' }}>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><CheckCircle2 size={16} color="#34d399" /> Pilih Konser & Kategori Tiket</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><CheckCircle2 size={16} color="#34d399" /> Verifikasi / Login Akun Penonton</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><CheckCircle2 size={16} color="#34d399" /> Pembayaran QRIS / E-Wallet Instan</li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><CheckCircle2 size={16} color="#34d399" /> E-Ticket QR Code masuk ke HP kamu</li>
+        )}
+      </nav>
+
+      <section
+        className="aur-hero"
+        style={{
+          maxWidth: 1240,
+          margin: "48px auto 64px",
+          padding: "0 20px",
+          display: "grid",
+          gap: 40,
+          alignItems: "center",
+        }}
+      >
+        <div>
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "6px 14px",
+              borderRadius: 20,
+              backgroundColor: "rgba(236,72,153,0.1)",
+              border: "1px solid rgba(236,72,153,0.3)",
+              color: THEME.pink,
+              fontSize: "0.75rem",
+              fontWeight: 700,
+              marginBottom: 20,
+            }}
+          >
+            <Sparkles size={14} />
+            AURALIS TICKETING ECOSYSTEM
+          </div>
+
+          <h1
+            className="aur-hero-title"
+            style={{
+              fontSize: "clamp(1.9rem, 4.2vw, 3.4rem)",
+              fontWeight: 900,
+              lineHeight: 1.15,
+              marginBottom: 20,
+              letterSpacing: "-1px",
+              color: THEME.text,
+            }}
+          >
+            Pesan Tiket Konser
+            <br />
+            <span
+              style={{
+                background: THEME.gradient,
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}
+            >
+              Tanpa Ribet & Aman
+            </span>
+          </h1>
+
+          <p
+            style={{
+              color: THEME.muted,
+              fontSize: "1rem",
+              lineHeight: 1.7,
+              marginBottom: 28,
+              maxWidth: 520,
+            }}
+          >
+            Dapatkan e-ticket instan untuk konser musik favoritmu. Untuk
+            pengelola venue atau EO, daftarkan tempatmu untuk sistem gate
+            scanner dan laporan otomatis.
+          </p>
+
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <a
+              href="#concert-list"
+              className="aur-btn-gradient"
+              style={{
+                padding: "13px 24px",
+                borderRadius: 12,
+                textDecoration: "none",
+                fontSize: "0.92rem",
+                fontWeight: 700,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <Ticket size={18} />
+              Lihat Konser
+            </a>
+            <button
+              onClick={goRegister}
+              style={{
+                padding: "13px 24px",
+                borderRadius: 12,
+                backgroundColor: "rgba(255,255,255,0.04)",
+                border: `1px solid ${THEME.borderStrong}`,
+                color: THEME.text,
+                fontSize: "0.92rem",
+                fontWeight: 600,
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <Building2 size={18} color={THEME.purple} />
+              Registrasi Venue
+            </button>
+          </div>
+        </div>
+
+        <div
+          style={{
+            backgroundColor: THEME.surface,
+            borderRadius: 24,
+            padding: "clamp(20px, 4vw, 32px)",
+            border: `1px solid ${THEME.border}`,
+            position: "relative",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              top: -60,
+              right: -60,
+              width: 180,
+              height: 180,
+              borderRadius: "50%",
+              background: THEME.gradient,
+              opacity: 0.15,
+              filter: "blur(40px)",
+              pointerEvents: "none",
+            }}
+          />
+
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              marginBottom: 20,
+              position: "relative",
+            }}
+          >
+            <Zap color={THEME.pink} size={24} />
+            <h3
+              style={{
+                fontSize: "clamp(1rem, 2.2vw, 1.15rem)",
+                fontWeight: 800,
+                color: THEME.text,
+                margin: 0,
+              }}
+            >
+              Alur Pemesanan Cepat & Aman
+            </h3>
+          </div>
+
+          <ul
+            style={{
+              listStyle: "none",
+              padding: 0,
+              margin: 0,
+              display: "flex",
+              flexDirection: "column",
+              gap: 14,
+              color: THEME.muted,
+              fontSize: "0.88rem",
+              position: "relative",
+            }}
+          >
+            {[
+              "Pilih Konser & Kategori Tiket",
+              "Login / Verifikasi Akun",
+              "Pembayaran QRIS / E-Wallet Instan",
+              "E-Ticket QR Code masuk ke HP",
+            ].map((t, i) => (
+              <li
+                key={i}
+                style={{ display: "flex", alignItems: "center", gap: 10 }}
+              >
+                <CheckCircle2 size={16} color={THEME.success} />
+                {t}
+              </li>
+            ))}
           </ul>
         </div>
       </section>
 
-      {/* CONCERT & EVENT LIST SECTION — 10 konser, sama seperti Home (lihat LANDING_EVENT_LIMIT) */}
-      <section id="concert-list" style={{ maxWidth: '1240px', margin: '0 auto 80px', padding: '0 24px', scrollMarginTop: '90px' }}>
-        <div style={{ marginBottom: '32px' }}>
-          <span style={{ color: '#ec4899', fontWeight: '700', fontSize: '0.85rem', letterSpacing: '1px' }}>TIKET TERSEDIA HARI INI</span>
-          <h2 style={{ fontSize: '2rem', fontWeight: '800', marginTop: '4px' }}>Jadwal Konser Musik Mendatang</h2>
+      <section
+        id="concert-list"
+        style={{
+          maxWidth: 1240,
+          margin: "0 auto 72px",
+          padding: "0 20px",
+          scrollMarginTop: 90,
+        }}
+      >
+        <div style={{ marginBottom: 28 }}>
+          <span
+            style={{
+              color: THEME.pink,
+              fontWeight: 700,
+              fontSize: "0.82rem",
+              letterSpacing: 1,
+            }}
+          >
+            TIKET TERSEDIA HARI INI
+          </span>
+          <h2
+            style={{
+              fontSize: "clamp(1.5rem, 3vw, 2rem)",
+              fontWeight: 800,
+              marginTop: 4,
+              color: THEME.text,
+            }}
+          >
+            Jadwal Konser Musik Mendatang
+          </h2>
         </div>
 
         {loadingEvents ? (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px', flexDirection: 'column', gap: '12px' }}>
-            <Loader2 size={32} color="#a855f7" style={{ animation: 'spin 1s linear infinite' }} />
-            <span style={{ color: '#94a3b8', fontSize: '14px' }}>Memuat konser terbaru...</span>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              minHeight: 200,
+              flexDirection: "column",
+              gap: 12,
+            }}
+          >
+            <Loader2
+              size={32}
+              color={THEME.pink}
+              style={{ animation: "spin 1s linear infinite" }}
+            />
+            <span style={{ color: THEME.muted, fontSize: 14 }}>
+              Memuat konser...
+            </span>
+          </div>
+        ) : events.length === 0 ? (
+          <div
+            style={{
+              textAlign: "center",
+              padding: "60px 20px",
+              backgroundColor: THEME.surface,
+              borderRadius: 20,
+              border: `1px dashed ${THEME.borderStrong}`,
+            }}
+          >
+            <Ticket size={44} color={THEME.dim} />
+            <h3 style={{ margin: "12px 0 4px", color: THEME.text }}>
+              Belum ada konser tersedia
+            </h3>
+            <p style={{ color: THEME.muted, fontSize: 13, margin: 0 }}>
+              Pantau terus untuk update konser terbaru.
+            </p>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: '28px' }}>
-            {events.map((evt) => {
-              const badgeColor = CATEGORY_BADGE_COLOR[evt.category] || '#a855f7';
-              return (
+          <div className="aur-events-grid">
+            {events.map((evt) => (
+              <div
+                key={evt.id}
+                className="aur-card-hover"
+                style={{
+                  backgroundColor: THEME.surface,
+                  borderRadius: 20,
+                  overflow: "hidden",
+                  border: `1px solid ${THEME.border}`,
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
                 <div
-                  key={evt.id}
-                  className="card-hover"
                   style={{
-                    backgroundColor: '#1e293b',
-                    borderRadius: '20px',
-                    overflow: 'hidden',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    display: 'flex',
-                    flexDirection: 'column'
+                    position: "relative",
+                    height: 170,
+                    backgroundColor: THEME.surfaceAlt,
                   }}
                 >
-                  {/* Event Image */}
-                  <div style={{ position: 'relative', height: '190px' }}>
-                    <img src={evt.image} alt={evt.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  {evt.image && (
+                    <img
+                      src={evt.image}
+                      alt={evt.title}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                        display: "block",
+                      }}
+                    />
+                  )}
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      background:
+                        "linear-gradient(180deg, transparent 40%, rgba(11,12,16,0.9) 100%)",
+                      pointerEvents: "none",
+                    }}
+                  />
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 12,
+                      left: 12,
+                      backgroundColor: "rgba(11,12,16,0.85)",
+                      color: THEME.pink,
+                      padding: "4px 10px",
+                      borderRadius: 14,
+                      fontSize: "0.7rem",
+                      fontWeight: 700,
+                      border: `1px solid ${THEME.pink}`,
+                    }}
+                  >
+                    {evt.category?.name || evt.category || "KONSER"}
+                  </span>
+                </div>
 
-                    {/* Badge Status */}
-                    <span style={{
-                      position: 'absolute', top: '12px', right: '12px',
-                      backgroundColor: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(8px)',
-                      color: badgeColor, border: `1px solid ${badgeColor}`,
-                      padding: '4px 10px', borderRadius: '16px', fontSize: '0.75rem', fontWeight: '700'
-                    }}>
-                      {evt.secondaryTag}
+                <div
+                  style={{
+                    padding: 18,
+                    display: "flex",
+                    flexDirection: "column",
+                    flexGrow: 1,
+                    justifyContent: "space-between",
+                    gap: 14,
+                  }}
+                >
+                  <div>
+                    <span
+                      style={{
+                        color: THEME.purple,
+                        fontWeight: 700,
+                        fontSize: "0.78rem",
+                      }}
+                    >
+                      {evt.artist || "Berbagai Artis"}
                     </span>
+                    <h3
+                      style={{
+                        fontSize: "1.05rem",
+                        fontWeight: 800,
+                        margin: "4px 0 10px",
+                        lineHeight: 1.3,
+                        color: THEME.text,
+                      }}
+                    >
+                      {evt.title}
+                    </h3>
 
-                    {/* City Tag */}
-                    <span style={{
-                      position: 'absolute', bottom: '12px', left: '12px',
-                      backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(8px)',
-                      color: '#fff', padding: '4px 10px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '600',
-                      display: 'flex', alignItems: 'center', gap: '4px'
-                    }}>
-                      <MapPin size={12} color="#ec4899" /> {evt.city}
-                    </span>
-                  </div>
-
-                  {/* Event Content */}
-                  <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', flexGrow: 1, justifyContent: 'space-between' }}>
-                    <div>
-                      <span style={{ color: '#a855f7', fontWeight: '700', fontSize: '0.82rem' }}>{evt.artist}</span>
-                      <h3 style={{ fontSize: '1.15rem', fontWeight: '800', margin: '4px 0 10px', lineHeight: '1.3' }}>{evt.title}</h3>
-
-                      <div style={{ fontSize: '0.85rem', color: '#94a3b8', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Calendar size={15} color="#ec4899" /> {evt.date}
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <MapPin size={15} color="#94a3b8" /> {evt.venue}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Price & Booking Button */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                      <div>
-                        <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Mulai dari</span>
-                        <span style={{ fontSize: '1.05rem', fontWeight: '800', color: '#34d399' }}>${evt.price}</span>
-                      </div>
-
-                      <button
-                        onClick={() => handleBookingClick(evt)}
-                        className="btn-gradient"
+                    <div
+                      style={{
+                        fontSize: "0.82rem",
+                        color: THEME.muted,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 6,
+                      }}
+                    >
+                      <div
                         style={{
-                          padding: '9px 16px', borderRadius: '10px', border: 'none',
-                          fontSize: '0.85rem', fontWeight: '700', cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', gap: '6px'
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          minWidth: 0,
                         }}
                       >
-                        Pesan Tiket <Ticket size={14} />
-                      </button>
+                        <Calendar
+                          size={14}
+                          color={THEME.pink}
+                          style={{ flexShrink: 0 }}
+                        />
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {evt.date ||
+                            (evt.event_date
+                              ? new Date(evt.event_date).toLocaleDateString("id-ID", {
+                                  day: "numeric",
+                                  month: "long",
+                                  year: "numeric",
+                                })
+                              : "-")}
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          minWidth: 0,
+                        }}
+                      >
+                        <MapPin
+                          size={14}
+                          color={THEME.purple}
+                          style={{ flexShrink: 0 }}
+                        />
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {evt.venue} {evt.city ? `, ${evt.city}` : ""}
+                        </span>
+                      </div>
                     </div>
                   </div>
+
+                  {/* TOMBOL PESAN TIKET -> LANGSUNG KE DETAIL */}
+                  <button
+                    onClick={() => handleBooking(evt)}
+                    className="aur-btn-gradient"
+                    style={{
+                      width: "100%",
+                      padding: "10px 14px",
+                      borderRadius: 10,
+                      border: "none",
+                      fontSize: "0.85rem",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                    }}
+                  >
+                    Pesan Tiket
+                    <ArrowRight size={14} />
+                  </button>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         )}
       </section>
 
-      {/* VENUE MANAGEMENT SOLUTIONS */}
-      <section id="venue-solutions" style={{ backgroundColor: '#1e293b', padding: '80px 24px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-        <div style={{ maxWidth: '1240px', margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: '50px' }}>
-            <span style={{ color: '#a855f7', fontWeight: '700', fontSize: '0.88rem', letterSpacing: '1px' }}>UNTUK PROMOTOR & ORGANISASI VENUE</span>
-            <h2 style={{ fontSize: '2.2rem', fontWeight: '800', marginTop: '6px' }}>Solusi Pengelolaan Event & Tempat</h2>
+      <section
+        id="venue-solutions"
+        style={{
+          backgroundColor: THEME.surface,
+          padding: "clamp(48px, 8vw, 72px) 20px",
+          borderTop: `1px solid ${THEME.border}`,
+        }}
+      >
+        <div style={{ maxWidth: 1240, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 44 }}>
+            <span
+              style={{
+                color: THEME.pink,
+                fontWeight: 700,
+                fontSize: "0.82rem",
+                letterSpacing: 1,
+              }}
+            >
+              UNTUK PROMOTOR & ORGANISASI VENUE
+            </span>
+            <h2
+              style={{
+                fontSize: "clamp(1.5rem, 3vw, 2.2rem)",
+                fontWeight: 800,
+                marginTop: 8,
+                color: THEME.text,
+              }}
+            >
+              Solusi Pengelolaan Event & Tempat
+            </h2>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '24px' }}>
-            <div style={{ backgroundColor: '#0f172a', padding: '28px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <Building2 size={32} color="#818cf8" style={{ marginBottom: '16px' }} />
-              <h3 style={{ fontSize: '1.15rem', fontWeight: '800', marginBottom: '8px' }}>Atur Jadwal & Slot Venue</h3>
-              <p style={{ color: '#94a3b8', fontSize: '0.88rem', lineHeight: 1.6 }}>Atur kalender booking venue, tipe tribun, dan reservasi dalam satu dashboard terpusat.</p>
-            </div>
-
-            <div style={{ backgroundColor: '#0f172a', padding: '28px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <QrCode size={32} color="#c084fc" style={{ marginBottom: '16px' }} />
-              <h3 style={{ fontSize: '1.15rem', fontWeight: '800', marginBottom: '8px' }}>Gate QR Scanner</h3>
-              <p style={{ color: '#94a3b8', fontSize: '0.88rem', lineHeight: 1.6 }}>Validasi tiket penonton secara otomatis di pintu masuk tanpa hambatan antrean.</p>
-            </div>
-
-            <div style={{ backgroundColor: '#0f172a', padding: '28px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <BarChart3 size={32} color="#38bdf8" style={{ marginBottom: '16px' }} />
-              <h3 style={{ fontSize: '1.15rem', fontWeight: '800', marginBottom: '8px' }}>Laporan Real-Time</h3>
-              <p style={{ color: '#94a3b8', fontSize: '0.88rem', lineHeight: 1.6 }}>Pantau total penjualan tiket dan pencairan dana langsung dari portal statistik mitra.</p>
-            </div>
+          <div className="aur-solutions-grid">
+            {[
+              {
+                icon: Building2,
+                title: "Atur Jadwal & Slot Venue",
+                desc: "Atur kalender booking venue, tipe tribun, dan reservasi dalam satu dashboard terpusat.",
+              },
+              {
+                icon: QrCode,
+                title: "Gate QR Scanner",
+                desc: "Validasi tiket penonton secara otomatis di pintu masuk tanpa hambatan antrean.",
+              },
+              {
+                icon: BarChart3,
+                title: "Laporan Real-Time",
+                desc: "Pantau total penjualan tiket dan pencairan dana langsung dari portal statistik mitra.",
+              },
+            ].map(({ icon: Icon, title, desc }, i) => (
+              <div
+                key={i}
+                style={{
+                  backgroundColor: THEME.surfaceAlt,
+                  padding: 26,
+                  borderRadius: 20,
+                  border: `1px solid ${THEME.border}`,
+                }}
+              >
+                <div
+                  style={{
+                    display: "inline-flex",
+                    padding: 12,
+                    borderRadius: 12,
+                    background: "rgba(236,72,153,0.1)",
+                    marginBottom: 16,
+                  }}
+                >
+                  <Icon size={24} color={THEME.pink} />
+                </div>
+                <h3
+                  style={{
+                    fontSize: "1.05rem",
+                    fontWeight: 800,
+                    marginBottom: 8,
+                    color: THEME.text,
+                  }}
+                >
+                  {title}
+                </h3>
+                <p
+                  style={{
+                    color: THEME.muted,
+                    fontSize: "0.86rem",
+                    lineHeight: 1.6,
+                    margin: 0,
+                  }}
+                >
+                  {desc}
+                </p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* DUAL REGISTRATION & LOGIN MODAL */}
-      {authModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 100, backgroundColor: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ backgroundColor: '#1e293b', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.12)', maxWidth: '500px', width: '100%', padding: '32px', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
-
-            {/* Close Modal */}
-            <button
-              onClick={() => { setAuthModalOpen(false); setSelectedConcert(null); }}
-              style={{ position: 'absolute', top: '20px', right: '20px', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
-            >
-              <X size={22} />
-            </button>
-
-            {/* If user clicked 'Pesan Tiket' without login */}
-            {selectedConcert && (
-              <div style={{ backgroundColor: 'rgba(236, 72, 153, 0.12)', border: '1px solid rgba(236, 72, 153, 0.3)', padding: '12px 16px', borderRadius: '12px', marginBottom: '20px', color: '#f472b6', fontSize: '0.85rem' }}>
-                🔑 <strong>Pemberitahuan:</strong> Silakan login/daftar akun terlebih dahulu untuk melanjutkan pesan tiket <strong>{selectedConcert.title} ({selectedConcert.artist})</strong>.
-              </div>
-            )}
-
-            {/* Role Switcher Tabs */}
-            <div style={{ display: 'flex', backgroundColor: '#0f172a', padding: '5px', borderRadius: '12px', marginBottom: '24px', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <button
-                onClick={() => setActiveRoleTab('user')}
-                className={activeRoleTab === 'user' ? 'active-tab' : ''}
-                style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', fontWeight: '700', fontSize: '0.85rem', cursor: 'pointer', color: '#94a3b8', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-              >
-                <User size={15} /> Akun Penonton
-              </button>
-              <button
-                onClick={() => setActiveRoleTab('organizer')}
-                className={activeRoleTab === 'organizer' ? 'active-tab' : ''}
-                style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', fontWeight: '700', fontSize: '0.85rem', cursor: 'pointer', color: '#94a3b8', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-              >
-                <Building2 size={15} /> Mitra Venue / EO
-              </button>
-            </div>
-
-            {/* TAB 1: REGISTRASI USER / PENONTON */}
-            {activeRoleTab === 'user' && (
-              <form onSubmit={handleUserSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div style={{ textAlign: 'center', marginBottom: '6px' }}>
-                  <h3 style={{ fontSize: '1.35rem', fontWeight: '800' }}>Daftar Akun Penonton</h3>
-                  <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginTop: '2px' }}>Isi data diri singkat untuk melanjutkan transaksi tiket.</p>
-                </div>
-
-                <div>
-                  <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Nama Lengkap</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Contoh: Budi Santoso"
-                    value={userForm.fullName}
-                    onChange={(e) => setUserForm({...userForm, fullName: e.target.value})}
-                    style={{ width: '100%', padding: '11px 14px', borderRadius: '10px', backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.88rem' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Alamat Email</label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="nama@email.com"
-                    value={userForm.email}
-                    onChange={(e) => setUserForm({...userForm, email: e.target.value})}
-                    style={{ width: '100%', padding: '11px 14px', borderRadius: '10px', backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.88rem' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Nomor WhatsApp</label>
-                  <input
-                    type="tel"
-                    required
-                    placeholder="08123456789"
-                    value={userForm.phone}
-                    onChange={(e) => setUserForm({...userForm, phone: e.target.value})}
-                    style={{ width: '100%', padding: '11px 14px', borderRadius: '10px', backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.88rem' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Kata Sandi</label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="Minimal 8 karakter"
-                    value={userForm.password}
-                    onChange={(e) => setUserForm({...userForm, password: e.target.value})}
-                    style={{ width: '100%', padding: '11px 14px', borderRadius: '10px', backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.88rem' }}
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="btn-gradient"
-                  style={{ width: '100%', padding: '13px', borderRadius: '12px', border: 'none', fontWeight: '700', fontSize: '0.92rem', cursor: 'pointer', marginTop: '6px' }}
-                >
-                  {selectedConcert ? 'Lanjut ke Pembayaran Tiket' : 'Daftar Akun User'}
-                </button>
-              </form>
-            )}
-
-            {/* TAB 2: REGISTRASI VENUE / ORGANIZER */}
-            {activeRoleTab === 'organizer' && (
-              <form onSubmit={handleOrganizerSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ textAlign: 'center', marginBottom: '6px' }}>
-                  <h3 style={{ fontSize: '1.35rem', fontWeight: '800' }}>Registrasi Venue / Organisasi</h3>
-                  <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginTop: '2px' }}>Daftarkan venue atau promotor event Anda.</p>
-                </div>
-
-                <div>
-                  <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Nama Perusahaan / Organisasi</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="PT Harmony Event"
-                    value={organizerForm.orgName}
-                    onChange={(e) => setOrganizerForm({...organizerForm, orgName: e.target.value})}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.85rem' }}
-                  />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  <div>
-                    <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Nama Venue</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Balai Sarbini"
-                      value={organizerForm.venueName}
-                      onChange={(e) => setOrganizerForm({...organizerForm, venueName: e.target.value})}
-                      style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.85rem' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Tipe Venue</label>
-                    <select
-                      value={organizerForm.venueType}
-                      onChange={(e) => setOrganizerForm({...organizerForm, venueType: e.target.value})}
-                      style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.85rem' }}
-                    >
-                      <option value="Concert Hall / Arena">Concert Hall</option>
-                      <option value="Stadium">Stadium</option>
-                      <option value="Amphitheater / Outdoor Park">Outdoor Park</option>
-                      <option value="Club / Lounge">Club / Lounge</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>Email Bisnis</label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="partner@organisasi.com"
-                    value={organizerForm.businessEmail}
-                    onChange={(e) => setOrganizerForm({...organizerForm, businessEmail: e.target.value})}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.85rem' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#cbd5e1', display: 'block', marginBottom: '4px' }}>No. HP / WhatsApp PIC</label>
-                  <input
-                    type="tel"
-                    required
-                    placeholder="08123456789"
-                    value={organizerForm.phone}
-                    onChange={(e) => setOrganizerForm({...organizerForm, phone: e.target.value})}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.85rem' }}
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="btn-gradient"
-                  style={{ width: '100%', padding: '13px', borderRadius: '12px', border: 'none', fontWeight: '700', fontSize: '0.92rem', cursor: 'pointer', marginTop: '6px' }}
-                >
-                  Kirim Permohonan Kemitraan
-                </button>
-              </form>
-            )}
-
-          </div>
-        </div>
-      )}
-
-      {/* FOOTER */}
-      <footer style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '36px 24px', textAlign: 'center', color: '#64748b', fontSize: '0.88rem' }}>
-        <p>© 2026 Auralis Indonesia — Ecosystem for Ticketing & Venue Management.</p>
+      <footer
+        style={{
+          borderTop: `1px solid ${THEME.border}`,
+          padding: "28px 20px",
+          textAlign: "center",
+          color: THEME.dim,
+          fontSize: "0.82rem",
+        }}
+      >
+        <p style={{ margin: 0 }}>
+          Auralis Indonesia - Ecosystem for Ticketing & Venue Management.
+        </p>
       </footer>
-
     </div>
   );
 }

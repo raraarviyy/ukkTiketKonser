@@ -1,557 +1,116 @@
-import React, { useMemo, useState } from "react";
-import {
-  Activity,
-  Bell,
-  Check,
-  ChevronRight,
-  Edit3,
-  KeyRound,
-  Lock,
-  Mail,
-  Save,
-  ShieldCheck,
-  User,
-  X,
-} from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { Activity, Bell, Check, Edit3, Eye, EyeOff, KeyRound, Loader2, Lock, Mail, Save, ShieldCheck, User, X } from "lucide-react";
+import { api } from "../../api/index";
+import { THEME } from "../../theme";
+import { useAuth } from "../../context/AuthContext";
 
 export default function AdminProfile() {
-  const [profile, setProfile] = useState({
-    name: "Super Admin",
-    email: "admin@ticketplatform.com",
-    phone: "+62 812 3456 7890",
-    role: "Super Administrator",
-  });
-
-  const [form, setForm] = useState(profile);
+  const { updateProfile } = useAuth();
+  const [profile, setProfile] = useState(null);
+  const [form, setForm] = useState({ name: "", email: "" });
   const [editing, setEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-
-  const [passwordForm, setPasswordForm] = useState({
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-  });
-
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+  const [savingPassword, setSavingPassword] = useState(false);
   const [saved, setSaved] = useState(false);
   const [passwordSaved, setPasswordSaved] = useState(false);
+  const [error, setError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
 
-  const initials = useMemo(() => {
-    return profile.name
-      .split(" ")
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((word) => word[0])
-      .join("")
-      .toUpperCase();
-  }, [profile.name]);
+  useEffect(() => {
+    (async () => {
+      try {
+        setLoading(true);
+        const res = await api.getMyProfile();
+        const u = res?.data ?? res;
+        setProfile(u);
+        setForm({ name: u?.name || "", email: u?.email || "" });
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
-  const handleSaveProfile = (event) => {
-    event.preventDefault();
+  const initials = useMemo(() => (profile?.name || "").split(" ").filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase(), [profile]);
 
-    setProfile(form);
-    setEditing(false);
-    setSaved(true);
-
-    setTimeout(() => {
-      setSaved(false);
-    }, 2500);
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    if (!form.name.trim() || !/\S+@\S+\.\S+/.test(form.email)) return setError("Data tidak valid.");
+    try {
+      setSaving(true);
+      const res = await api.updateMyProfile({ name: form.name.trim(), email: form.email.trim() });
+      const u = res?.data ?? res;
+      setProfile(prev => ({ ...prev, ...u }));
+      updateProfile?.(u);
+      setEditing(false); setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) { setError(err.message); } finally { setSaving(false); }
   };
 
-  const handleCancelEdit = () => {
-    setForm(profile);
-    setEditing(false);
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setPasswordError("");
+    if (passwordForm.newPassword.length < 6) return setPasswordError("Password minimal 6 karakter.");
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) return setPasswordError("Konfirmasi tidak sama.");
+    try {
+      setSavingPassword(true);
+      await api.changeMyPassword({ oldPassword: passwordForm.currentPassword, newPassword: passwordForm.newPassword });
+      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setPasswordSaved(true);
+      setTimeout(() => setPasswordSaved(false), 2500);
+    } catch (err) { setPasswordError(err.message); } finally { setSavingPassword(false); }
   };
 
-  const handleChangePassword = (event) => {
-    event.preventDefault();
-
-    if (
-      !passwordForm.currentPassword ||
-      !passwordForm.newPassword ||
-      !passwordForm.confirmPassword
-    ) {
-      return;
-    }
-
-    if (
-      passwordForm.newPassword !==
-      passwordForm.confirmPassword
-    ) {
-      return;
-    }
-
-    setPasswordSaved(true);
-
-    setPasswordForm({
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    });
-
-    setTimeout(() => {
-      setPasswordSaved(false);
-    }, 2500);
-  };
+  if (loading) return <div style={{ display: "flex", height: 300, alignItems: "center", justifyContent: "center" }}><Loader2 size={32} color={THEME.pink} style={{ animation: "spin 1s linear infinite" }} /></div>;
 
   return (
-    <div className="mx-auto w-full max-w-[1200px]">
-      <div className="mb-8">
-        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1.5 text-xs font-medium text-blue-300">
-          <User size={13} />
-          Account Settings
-        </div>
-
-        <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-          Profile
-        </h1>
-
-        <p className="mt-2 max-w-2xl text-sm text-slate-400">
-          Kelola informasi akun dan keamanan Super Admin.
-        </p>
+    <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 1000 }}>
+      <div>
+        <h1 style={{ margin: 0, fontSize: "clamp(1.4rem, 3vw, 1.9rem)", fontWeight: 800, color: THEME.text }}>Profile</h1>
+        <p style={{ margin: "6px 0 0", fontSize: "0.9rem", color: THEME.muted }}>Kelola informasi akun dan keamanan Super Admin.</p>
       </div>
 
-      {saved && (
-        <div className="mb-5 flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-xs text-emerald-400">
-          <Check size={16} />
-          Informasi profile berhasil diperbarui.
-        </div>
-      )}
+      {saved && <div style={{ padding: "12px 16px", borderRadius: 12, background: "rgba(16,185,129,0.1)", border: `1px solid ${THEME.success}`, color: THEME.success, fontSize: "0.85rem", display: "flex", alignItems: "center", gap: 8 }}><Check size={16} /> Profil diperbarui.</div>}
+      {error && <div style={{ padding: "12px 16px", borderRadius: 12, background: "rgba(239,68,68,0.1)", border: `1px solid ${THEME.danger}`, color: THEME.danger, fontSize: "0.85rem", display: "flex", alignItems: "center", gap: 8 }}><X size={16} /> {error}</div>}
 
-      {passwordSaved && (
-        <div className="mb-5 flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-xs text-emerald-400">
-          <Check size={16} />
-          Password berhasil diperbarui.
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_360px]">
-        <div className="space-y-6">
-          <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0d1422]">
-            <div className="border-b border-white/10 px-5 py-5 sm:px-6">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h2 className="text-sm font-semibold text-white">
-                    Informasi Profile
-                  </h2>
-
-                  <p className="mt-1 text-xs text-slate-600">
-                    Informasi dasar akun administrator.
-                  </p>
-                </div>
-
-                {!editing && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setForm(profile);
-                      setEditing(true);
-                    }}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/10 px-4 text-xs font-semibold text-slate-300 transition hover:bg-white/5 hover:text-white"
-                  >
-                    <Edit3 size={14} />
-                    Edit Profile
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div className="p-5 sm:p-6">
-              <div className="flex flex-col items-center gap-4 border-b border-white/5 pb-6 sm:flex-row">
-                <div className="relative flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500/30 to-purple-500/20 text-xl font-bold text-blue-300 ring-1 ring-blue-500/20">
-                  {initials}
-
-                  <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border-4 border-[#0d1422] bg-emerald-500">
-                    <Check size={10} className="text-white" />
-                  </div>
-                </div>
-
-                <div className="text-center sm:text-left">
-                  <h3 className="text-lg font-bold text-white">
-                    {profile.name}
-                  </h3>
-
-                  <p className="mt-1 text-xs text-slate-500">
-                    {profile.email}
-                  </p>
-
-                  <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-purple-500/20 bg-purple-500/10 px-2.5 py-1 text-[10px] font-semibold text-purple-400">
-                    <ShieldCheck size={12} />
-                    {profile.role}
-                  </div>
-                </div>
-              </div>
-
-              <form
-                onSubmit={handleSaveProfile}
-                className="mt-6 space-y-5"
-              >
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-2 block text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                      Nama Lengkap
-                    </label>
-
-                    <div className="relative">
-                      <User
-                        size={15}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600"
-                      />
-
-                      <input
-                        type="text"
-                        value={form.name}
-                        disabled={!editing}
-                        onChange={(event) =>
-                          setForm((current) => ({
-                            ...current,
-                            name: event.target.value,
-                          }))
-                        }
-                        className={`h-11 w-full rounded-xl border pl-10 pr-4 text-sm outline-none ${
-                          editing
-                            ? "border-white/10 bg-[#090f1b] text-white focus:border-blue-500/40"
-                            : "border-white/5 bg-white/[0.02] text-slate-400"
-                        }`}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                      Email
-                    </label>
-
-                    <div className="relative">
-                      <Mail
-                        size={15}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600"
-                      />
-
-                      <input
-                        type="email"
-                        value={form.email}
-                        disabled={!editing}
-                        onChange={(event) =>
-                          setForm((current) => ({
-                            ...current,
-                            email: event.target.value,
-                          }))
-                        }
-                        className={`h-11 w-full rounded-xl border pl-10 pr-4 text-sm outline-none ${
-                          editing
-                            ? "border-white/10 bg-[#090f1b] text-white focus:border-blue-500/40"
-                            : "border-white/5 bg-white/[0.02] text-slate-400"
-                        }`}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                      Nomor Telepon
-                    </label>
-
-                    <input
-                      type="text"
-                      value={form.phone}
-                      disabled={!editing}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          phone: event.target.value,
-                        }))
-                      }
-                      className={`h-11 w-full rounded-xl border px-4 text-sm outline-none ${
-                        editing
-                          ? "border-white/10 bg-[#090f1b] text-white focus:border-blue-500/40"
-                          : "border-white/5 bg-white/[0.02] text-slate-400"
-                      }`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                      Role
-                    </label>
-
-                    <div className="flex h-11 items-center gap-2 rounded-xl border border-white/5 bg-white/[0.02] px-4">
-                      <ShieldCheck
-                        size={15}
-                        className="text-purple-400"
-                      />
-
-                      <span className="text-sm text-slate-400">
-                        {profile.role}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {editing && (
-                  <div className="flex flex-col gap-2 border-t border-white/5 pt-5 sm:flex-row sm:justify-end">
-                    <button
-                      type="button"
-                      onClick={handleCancelEdit}
-                      className="rounded-xl border border-white/10 px-5 py-3 text-xs font-semibold text-slate-400 transition hover:bg-white/5 hover:text-white"
-                    >
-                      Batal
-                    </button>
-
-                    <button
-                      type="submit"
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-500 px-5 py-3 text-xs font-bold text-white transition hover:bg-blue-400"
-                    >
-                      <Save size={14} />
-                      Simpan Perubahan
-                    </button>
-                  </div>
-                )}
-              </form>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 24 }}>
+        <div style={{ backgroundColor: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 20, padding: 24 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+            <h2 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700 }}>Informasi Profile</h2>
+            {!editing && <button onClick={() => setEditing(true)} style={{ background: "none", border: "none", color: THEME.pink, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: "0.85rem", fontWeight: 600 }}><Edit3 size={14} /> Edit</button>}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24 }}>
+            <div style={{ width: 70, height: 70, borderRadius: 20, background: THEME.gradient, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, fontWeight: 800 }}>{initials}</div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: "1.2rem" }}>{profile?.name}</h3>
+              <p style={{ margin: "4px 0 0", fontSize: "0.85rem", color: THEME.muted }}>{profile?.email}</p>
+              <span style={{ display: "inline-block", marginTop: 8, padding: "4px 10px", borderRadius: 20, background: "rgba(236,72,153,0.1)", color: THEME.pink, fontSize: "0.7rem", fontWeight: 700 }}><ShieldCheck size={12} style={{ display: "inline", marginRight: 4 }} />{profile?.role_relation?.name || "Admin"}</span>
             </div>
           </div>
-
-          <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0d1422]">
-            <div className="border-b border-white/10 px-5 py-5 sm:px-6">
-              <div>
-                <h2 className="text-sm font-semibold text-white">
-                  Keamanan Akun
-                </h2>
-
-                <p className="mt-1 text-xs text-slate-600">
-                  Ubah password untuk menjaga keamanan akun.
-                </p>
-              </div>
-            </div>
-
-            <form
-              onSubmit={handleChangePassword}
-              className="p-5 sm:p-6"
-            >
-              <div className="space-y-5">
-                <PasswordInput
-                  label="Password Saat Ini"
-                  value={passwordForm.currentPassword}
-                  onChange={(value) =>
-                    setPasswordForm((current) => ({
-                      ...current,
-                      currentPassword: value,
-                    }))
-                  }
-                  visible={showPassword}
-                />
-
-                <PasswordInput
-                  label="Password Baru"
-                  value={passwordForm.newPassword}
-                  onChange={(value) =>
-                    setPasswordForm((current) => ({
-                      ...current,
-                      newPassword: value,
-                    }))
-                  }
-                  visible={showPassword}
-                />
-
-                <PasswordInput
-                  label="Konfirmasi Password Baru"
-                  value={passwordForm.confirmPassword}
-                  onChange={(value) =>
-                    setPasswordForm((current) => ({
-                      ...current,
-                      confirmPassword: value,
-                    }))
-                  }
-                  visible={showPassword}
-                />
-              </div>
-
-              <div className="mt-5 flex items-center justify-between gap-4 rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <Lock size={15} className="text-blue-400" />
-
-                  <p className="text-xs text-slate-400">
-                    Gunakan password minimal 8 karakter.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setShowPassword(!showPassword)
-                  }
-                  className="shrink-0 text-[10px] font-semibold text-blue-400 hover:text-blue-300"
-                >
-                  {showPassword ? "Sembunyikan" : "Tampilkan"}
-                </button>
-              </div>
-
-              {passwordForm.newPassword &&
-                passwordForm.confirmPassword &&
-                passwordForm.newPassword !==
-                  passwordForm.confirmPassword && (
-                  <p className="mt-3 text-xs text-red-400">
-                    Konfirmasi password tidak sama.
-                  </p>
-                )}
-
-              <div className="mt-5 flex justify-end">
-                <button
-                  type="submit"
-                  disabled={
-                    !passwordForm.currentPassword ||
-                    !passwordForm.newPassword ||
-                    !passwordForm.confirmPassword ||
-                    passwordForm.newPassword !==
-                      passwordForm.confirmPassword
-                  }
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-500 px-5 py-3 text-xs font-bold text-white transition hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <KeyRound size={14} />
-                  Ubah Password
-                </button>
-              </div>
-            </form>
-          </div>
+          <form onSubmit={handleSaveProfile} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div><label style={{ display: "block", fontSize: "0.8rem", color: THEME.muted, marginBottom: 6 }}>Nama</label><input type="text" disabled={!editing} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={{ width: "100%", padding: "12px", borderRadius: 12, background: editing ? THEME.bg : "transparent", border: `1px solid ${THEME.border}`, color: THEME.text, outline: "none" }} /></div>
+            <div><label style={{ display: "block", fontSize: "0.8rem", color: THEME.muted, marginBottom: 6 }}>Email</label><input type="email" disabled={!editing} value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} style={{ width: "100%", padding: "12px", borderRadius: 12, background: editing ? THEME.bg : "transparent", border: `1px solid ${THEME.border}`, color: THEME.text, outline: "none" }} /></div>
+            {editing && <div style={{ display: "flex", gap: 8, marginTop: 8 }}><button type="button" onClick={() => setEditing(false)} style={{ flex: 1, padding: 10, borderRadius: 10, border: `1px solid ${THEME.border}`, background: "transparent", color: THEME.muted, cursor: "pointer" }}>Batal</button><button type="submit" disabled={saving} style={{ flex: 1, padding: 10, borderRadius: 10, border: "none", background: THEME.gradient, color: "#fff", cursor: "pointer" }}>{saving ? "..." : "Simpan"}</button></div>}
+          </form>
         </div>
 
-        <div className="space-y-6">
-          <div className="rounded-2xl border border-white/10 bg-[#0d1422] p-5">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400">
-                <ShieldCheck size={18} />
-              </div>
-
-              <div>
-                <h2 className="text-sm font-semibold text-white">
-                  Account Status
-                </h2>
-
-                <p className="mt-1 text-[10px] text-slate-600">
-                  Status akun administrator
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-5 flex items-center justify-between rounded-xl border border-emerald-500/10 bg-emerald-500/5 px-4 py-3">
-              <div>
-                <p className="text-xs font-semibold text-emerald-400">
-                  Active
-                </p>
-
-                <p className="mt-1 text-[10px] text-slate-600">
-                  Akun dapat mengakses dashboard.
-                </p>
-              </div>
-
-              <div className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-[#0d1422] p-5">
-            <h2 className="text-sm font-semibold text-white">
-              Security Overview
-            </h2>
-
-            <div className="mt-5 space-y-1">
-              <SecurityItem
-                icon={Lock}
-                title="Password"
-                value="Protected"
-              />
-
-              <SecurityItem
-                icon={Mail}
-                title="Email"
-                value="Verified"
-              />
-
-              <SecurityItem
-                icon={Activity}
-                title="Account Activity"
-                value="Normal"
-              />
-
-              <SecurityItem
-                icon={Bell}
-                title="Notifications"
-                value="Enabled"
-              />
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-blue-500/10 bg-blue-500/5 p-5">
-            <div className="flex items-start gap-3">
-              <ShieldCheck
-                size={18}
-                className="mt-0.5 shrink-0 text-blue-400"
-              />
-
-              <div>
-                <h2 className="text-sm font-semibold text-white">
-                  Super Admin Access
-                </h2>
-
-                <p className="mt-2 text-xs leading-6 text-slate-400">
-                  Akun ini memiliki akses penuh untuk mengelola
-                  organizer, concert, user, transaksi, ticket,
-                  settlement, laporan, dan pengaturan platform.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-4 flex items-center gap-2 text-[10px] font-semibold text-blue-400">
-              <span>View permissions</span>
-              <ChevronRight size={13} />
-            </div>
-          </div>
+        <div style={{ backgroundColor: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 20, padding: 24 }}>
+          <h2 style={{ margin: "0 0 20px", fontSize: "1.1rem", fontWeight: 700 }}>Keamanan Akun</h2>
+          {passwordSaved && <div style={{ marginBottom: 16, padding: "10px", borderRadius: 10, background: "rgba(16,185,129,0.1)", color: THEME.success, fontSize: "0.8rem" }}>Password diubah.</div>}
+          {passwordError && <div style={{ marginBottom: 16, padding: "10px", borderRadius: 10, background: "rgba(239,68,68,0.1)", color: THEME.danger, fontSize: "0.8rem" }}>{passwordError}</div>}
+          <form onSubmit={handleChangePassword} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div><label style={{ display: "block", fontSize: "0.8rem", color: THEME.muted, marginBottom: 6 }}>Password Lama</label><input type={showPassword ? "text" : "password"} value={passwordForm.currentPassword} onChange={e => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })} style={{ width: "100%", padding: "12px", borderRadius: 12, background: THEME.bg, border: `1px solid ${THEME.border}`, color: THEME.text, outline: "none" }} /></div>
+            <div><label style={{ display: "block", fontSize: "0.8rem", color: THEME.muted, marginBottom: 6 }}>Password Baru</label><input type={showPassword ? "text" : "password"} value={passwordForm.newPassword} onChange={e => setPasswordForm({ ...passwordForm, newPassword: e.target.value })} style={{ width: "100%", padding: "12px", borderRadius: 12, background: THEME.bg, border: `1px solid ${THEME.border}`, color: THEME.text, outline: "none" }} /></div>
+            <div><label style={{ display: "block", fontSize: "0.8rem", color: THEME.muted, marginBottom: 6 }}>Konfirmasi</label><input type={showPassword ? "text" : "password"} value={passwordForm.confirmPassword} onChange={e => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })} style={{ width: "100%", padding: "12px", borderRadius: 12, background: THEME.bg, border: `1px solid ${THEME.border}`, color: THEME.text, outline: "none" }} /></div>
+            <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ alignSelf: "flex-start", background: "none", border: "none", color: THEME.pink, fontSize: "0.8rem", cursor: "pointer" }}>{showPassword ? "Sembunyikan Password" : "Tampilkan Password"}</button>
+            <button type="submit" disabled={savingPassword} style={{ width: "100%", padding: 12, borderRadius: 12, border: "none", background: THEME.gradient, color: "#fff", fontWeight: 700, cursor: "pointer", marginTop: 8 }}>{savingPassword ? "Menyimpan..." : "Ubah Password"}</button>
+          </form>
         </div>
       </div>
-    </div>
-  );
-}
-
-function PasswordInput({
-  label,
-  value,
-  onChange,
-  visible,
-}) {
-  return (
-    <div>
-      <label className="mb-2 block text-[10px] font-bold uppercase tracking-wider text-slate-600">
-        {label}
-      </label>
-
-      <div className="relative">
-        <KeyRound
-          size={15}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600"
-        />
-
-        <input
-          type={visible ? "text" : "password"}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder="Masukkan password"
-          className="h-11 w-full rounded-xl border border-white/10 bg-[#090f1b] pl-10 pr-4 text-sm text-white outline-none placeholder:text-slate-600 focus:border-blue-500/40"
-        />
-      </div>
-    </div>
-  );
-}
-
-function SecurityItem({ icon: Icon, title, value }) {
-  return (
-    <div className="flex items-center justify-between rounded-xl px-3 py-3 transition hover:bg-white/[0.02]">
-      <div className="flex items-center gap-3">
-        <Icon size={15} className="text-slate-500" />
-
-        <span className="text-xs text-slate-400">{title}</span>
-      </div>
-
-      <span className="text-[10px] font-semibold text-emerald-400">
-        {value}
-      </span>
     </div>
   );
 }

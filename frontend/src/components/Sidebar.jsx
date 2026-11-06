@@ -80,7 +80,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
           <div style={{ padding: '0 8px 32px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <h1 style={{ color: '#fff', fontSize: '22px', fontWeight: '800', margin: 0, letterSpacing: '-0.5px' }}>
-                VibePass<span style={{ color: '#ec4899' }}>.</span>
+                Auralis<span style={{ color: '#ec4899' }}>.</span>
               </h1>
               <p style={{ color: '#6b7280', fontSize: '11px', margin: '4px 0 0 0', fontWeight: '500' }}>
                 Premium Ticketing

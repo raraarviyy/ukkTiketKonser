@@ -3,84 +3,72 @@ import {
   Check,
   ChevronDown,
   Eye,
-  Mail,
   MoreHorizontal,
   Search,
   ShieldCheck,
-  UserRound,
   Users,
   UserCog,
   X,
 } from "lucide-react";
 import { useAdmin } from "../context/AdminContext";
+import { THEME } from "../../theme";
 
-const statusConfig = {
-  active: {
-    label: "Active",
-    className:
-      "border-emerald-500/20 bg-emerald-500/10 text-emerald-400",
-  },
-  suspended: {
-    label: "Suspended",
-    className: "border-rose-500/20 bg-rose-500/10 text-rose-400",
-  },
+const formatNumber = (value) => new Intl.NumberFormat("id-ID").format(value || 0);
+
+const roleColor = {
+  User: { bg: "rgba(156,163,175,0.1)", color: "#9ca3af", label: "User" },
+  Organizer: { bg: "rgba(168,85,247,0.1)", color: "#a855f7", label: "Organizer" },
+  Penyelenggara: { bg: "rgba(168,85,247,0.1)", color: "#a855f7", label: "Organizer" },
+  "Super Admin": { bg: "rgba(236,72,153,0.1)", color: "#ec4899", label: "Super Admin" },
+  Admin: { bg: "rgba(236,72,153,0.1)", color: "#ec4899", label: "Super Admin" },
 };
 
-const roleConfig = {
-  User: {
-    label: "User",
-    className: "bg-slate-500/10 text-slate-300",
-  },
-  Organizer: {
-    label: "Organizer",
-    className: "bg-purple-500/10 text-purple-400",
-  },
-  "Super Admin": {
-    label: "Super Admin",
-    className: "bg-cyan-500/10 text-cyan-400",
-  },
+const statusColor = {
+  active: { bg: "rgba(16,185,129,0.1)", color: "#10b981", label: "Active" },
+  suspended: { bg: "rgba(239,68,68,0.1)", color: "#ef4444", label: "Suspended" },
 };
 
-const formatNumber = (value) =>
-  new Intl.NumberFormat("id-ID").format(value);
+// FUNGSI SAKTI UNTUK MEMBACA ROLE DARI BACKEND
+const getRoleName = (user) => {
+  const rawRole = user.role_relation?.name || user.role_name || user.role;
+  if (rawRole && typeof rawRole === 'object') return rawRole.name;
+  // Fallback jika Backend mengirim ID angka
+  if (rawRole === 1) return "User";
+  if (rawRole === 2) return "Super Admin";
+  if (rawRole === 3) return "Penyelenggara";
+  return rawRole || "User";
+};
 
-function StatusBadge({ status }) {
-  const config = statusConfig[status] || statusConfig.active;
+function Badge({ type, value }) {
+  // Jika value berupa ID angka dari BE, konversi dulu
+  let displayValue = value;
+  if (type === "role") {
+    if (value === 1) displayValue = "User";
+    if (value === 2) displayValue = "Super Admin";
+    if (value === 3) displayValue = "Penyelenggara";
+  }
 
+  const config = type === "role" 
+    ? (roleColor[displayValue] || roleColor.User) 
+    : (statusColor[displayValue] || statusColor.active);
+    
   return (
-    <span
-      className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold ${config.className}`}
-    >
-      {config.label}
+    <span style={{ padding: "4px 10px", borderRadius: 20, fontSize: "0.7rem", fontWeight: 700, backgroundColor: config.bg, color: config.color, display: "inline-block", whiteSpace: "nowrap" }}>
+      {config.label || displayValue}
     </span>
   );
 }
 
-function RoleBadge({ role }) {
-  const config = roleConfig[role] || roleConfig.User;
-
+function StatCard({ title, value, icon: Icon, color }) {
   return (
-    <span
-      className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ${config.className}`}
-    >
-      {config.label}
-    </span>
-  );
-}
-
-function StatCard({ title, value, icon: Icon, iconClass }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-[#0d1422] p-5">
-      <div className="flex items-center justify-between">
+    <div style={{ backgroundColor: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 16, padding: 20 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <p className="text-xs font-medium text-slate-500">{title}</p>
-          <p className="mt-2 text-2xl font-bold text-white">{value}</p>
+          <p style={{ margin: 0, fontSize: "0.8rem", color: THEME.muted, fontWeight: 500 }}>{title}</p>
+          <h3 style={{ margin: "6px 0 0", fontSize: "clamp(1.2rem, 4vw, 1.5rem)", fontWeight: 800, color: THEME.text }}>{value}</h3>
         </div>
-
-        <div
-          className={`flex h-11 w-11 items-center justify-center rounded-xl ${iconClass}`}
-        >
-          <Icon size={20} />
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: `${color}15`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <Icon size={20} color={color} />
         </div>
       </div>
     </div>
@@ -88,12 +76,7 @@ function StatCard({ title, value, icon: Icon, iconClass }) {
 }
 
 export default function AdminUsers() {
-  const {
-    users,
-    suspendUser,
-    activateUser,
-    changeUserRole,
-  } = useAdmin();
+  const { users, suspendUser, activateUser, changeUserRole } = useAdmin();
 
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -104,592 +87,187 @@ export default function AdminUsers() {
   const [showStatusFilter, setShowStatusFilter] = useState(false);
 
   const filteredUsers = useMemo(() => {
-    return users.filter((user) => {
-      const keyword = search.toLowerCase();
-
-      const matchesSearch =
-        user.name.toLowerCase().includes(keyword) ||
-        user.email.toLowerCase().includes(keyword);
-
-      const matchesRole =
-        roleFilter === "all" || user.role === roleFilter;
-
-      const matchesStatus =
-        statusFilter === "all" || user.status === statusFilter;
-
+    return users.filter((u) => {
+      const kw = search.toLowerCase();
+      const matchesSearch = (u.name || "").toLowerCase().includes(kw) || (u.email || "").toLowerCase().includes(kw);
+      
+      const roleName = getRoleName(u);
+      const matchesRole = roleFilter === "all" || roleName === roleFilter || (roleFilter === "Organizer" && roleName === "Penyelenggara");
+      
+      const matchesStatus = statusFilter === "all" || u.status === statusFilter;
+      
       return matchesSearch && matchesRole && matchesStatus;
     });
   }, [users, search, roleFilter, statusFilter]);
 
-  const activeUsers = users.filter(
-    (user) => user.status === "active"
-  ).length;
-
-  const suspendedUsers = users.filter(
-    (user) => user.status === "suspended"
-  ).length;
-
-  const organizerUsers = users.filter(
-    (user) => user.role === "Organizer"
-  ).length;
-
-  const handleRoleChange = (id, role) => {
-    changeUserRole(id, role);
-    setMenuId(null);
-  };
+  const activeUsers = users.filter(u => u.status === "active").length;
+  const suspendedUsers = users.filter(u => u.status === "suspended").length;
+  const organizerUsers = users.filter(u => {
+    const r = getRoleName(u);
+    return r === "Organizer" || r === "Penyelenggara";
+  }).length;
 
   return (
-    <div className="mx-auto w-full max-w-[1600px]">
-      <div className="mb-8">
-        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-purple-500/20 bg-purple-500/10 px-3 py-1.5 text-xs font-medium text-purple-300">
-          <Users size={13} />
-          User Management
+    <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 1400 }}>
+      <div>
+        <h1 style={{ margin: 0, fontSize: "clamp(1.4rem, 3vw, 1.9rem)", fontWeight: 800, color: THEME.text }}>User Management</h1>
+        <p style={{ margin: "6px 0 0", fontSize: "0.9rem", color: THEME.muted }}>Kelola seluruh pengguna platform, status akun, dan hak akses.</p>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
+        <StatCard title="Total Users" value={formatNumber(users.length)} icon={Users} color={THEME.pink} />
+        <StatCard title="Active" value={formatNumber(activeUsers)} icon={Check} color={THEME.success} />
+        <StatCard title="Suspended" value={formatNumber(suspendedUsers)} icon={ShieldCheck} color={THEME.danger} />
+        <StatCard title="Organizers" value={formatNumber(organizerUsers)} icon={UserCog} color={THEME.purple} />
+      </div>
+
+      <div style={{ backgroundColor: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 18, padding: 20, display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", background: THEME.bg, border: `1px solid ${THEME.border}`, borderRadius: 12, padding: "0 14px", flex: "1 1 300px" }}>
+          <Search size={18} color={THEME.dim} />
+          <input 
+            type="text" placeholder="Cari nama atau email..." value={search} onChange={e => setSearch(e.target.value)}
+            style={{ width: "100%", background: "none", border: "none", padding: "12px", color: THEME.text, outline: "none", fontSize: "0.9rem" }} 
+          />
         </div>
-
-        <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-          User Management
-        </h1>
-
-        <p className="mt-2 max-w-2xl text-sm text-slate-400">
-          Kelola seluruh pengguna platform, status akun, dan hak akses
-          berdasarkan role.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <StatCard
-          title="Total Users"
-          value={formatNumber(users.length)}
-          icon={Users}
-          iconClass="bg-purple-500/10 text-purple-400"
-        />
-
-        <StatCard
-          title="Active Users"
-          value={formatNumber(activeUsers)}
-          icon={Check}
-          iconClass="bg-emerald-500/10 text-emerald-400"
-        />
-
-        <StatCard
-          title="Suspended"
-          value={formatNumber(suspendedUsers)}
-          icon={ShieldCheck}
-          iconClass="bg-rose-500/10 text-rose-400"
-        />
-
-        <StatCard
-          title="Organizer"
-          value={formatNumber(organizerUsers)}
-          icon={UserCog}
-          iconClass="bg-cyan-500/10 text-cyan-400"
-        />
-
-        <StatCard
-          title="Regular User"
-          value={formatNumber(
-            users.filter((user) => user.role === "User").length
-          )}
-          icon={UserRound}
-          iconClass="bg-slate-500/10 text-slate-300"
-        />
-      </div>
-
-      <div className="mt-6 rounded-2xl border border-white/10 bg-[#0d1422] p-4 sm:p-5">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div className="relative w-full xl:max-w-lg">
-            <Search
-              size={17}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600"
-            />
-
-            <input
-              type="text"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Cari nama atau email..."
-              className="h-11 w-full rounded-xl border border-white/10 bg-[#090f1b] pl-10 pr-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-purple-500/40"
-            />
+        
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          {/* Filter Role */}
+          <div style={{ position: "relative" }}>
+            <button onClick={() => { setShowRoleFilter(!showRoleFilter); setShowStatusFilter(false); }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", background: THEME.bg, border: `1px solid ${THEME.border}`, borderRadius: 12, color: THEME.text, cursor: "pointer", fontSize: "0.85rem" }}>
+              {roleFilter === "all" ? "Semua Role" : roleColor[roleFilter]?.label || roleFilter} <ChevronDown size={14} />
+            </button>
+            {showRoleFilter && (
+              <>
+                <div style={{ position: "fixed", inset: 0, zIndex: 10 }} onClick={() => setShowRoleFilter(false)} />
+                <div style={{ position: "absolute", right: 0, top: 44, background: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 12, padding: 6, zIndex: 20, minWidth: 160, boxShadow: "0 10px 25px rgba(0,0,0,0.5)" }}>
+                  {["all", "User", "Organizer", "Admin"].map(r => (
+                    <button key={r} onClick={() => { setRoleFilter(r); setShowRoleFilter(false); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 12px", background: "none", border: "none", color: roleFilter === r ? THEME.pink : THEME.muted, fontSize: "0.85rem", cursor: "pointer", borderRadius: 8 }}>
+                      {r === "all" ? "Semua Role" : roleColor[r]?.label || r}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
-
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowRoleFilter(!showRoleFilter);
-                  setShowStatusFilter(false);
-                }}
-                className="flex h-11 w-full items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.02] px-4 text-xs font-semibold text-slate-300 transition hover:bg-white/5 hover:text-white sm:w-40"
-              >
-                {roleFilter === "all" ? "Semua Role" : roleFilter}
-                <ChevronDown
-                  size={15}
-                  className={`transition ${
-                    showRoleFilter ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
-
-              {showRoleFilter && (
-                <>
-                  <button
-                    type="button"
-                    aria-label="Close role filter"
-                    onClick={() => setShowRoleFilter(false)}
-                    className="fixed inset-0 z-10 cursor-default"
-                  />
-
-                  <div className="absolute right-0 top-12 z-20 w-44 rounded-xl border border-white/10 bg-[#151c2c] p-1.5 shadow-2xl">
-                    {[
-                      { value: "all", label: "Semua Role" },
-                      { value: "User", label: "User" },
-                      { value: "Organizer", label: "Organizer" },
-                      { value: "Super Admin", label: "Super Admin" },
-                    ].map((item) => (
-                      <button
-                        key={item.value}
-                        type="button"
-                        onClick={() => {
-                          setRoleFilter(item.value);
-                          setShowRoleFilter(false);
-                        }}
-                        className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-xs transition ${
-                          roleFilter === item.value
-                            ? "bg-purple-500/10 text-purple-400"
-                            : "text-slate-400 hover:bg-white/5 hover:text-white"
-                        }`}
-                      >
-                        {item.label}
-
-                        {roleFilter === item.value && (
-                          <Check size={14} />
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowStatusFilter(!showStatusFilter);
-                  setShowRoleFilter(false);
-                }}
-                className="flex h-11 w-full items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.02] px-4 text-xs font-semibold text-slate-300 transition hover:bg-white/5 hover:text-white sm:w-40"
-              >
-                {statusFilter === "all"
-                  ? "Semua Status"
-                  : statusConfig[statusFilter]?.label}
-
-                <ChevronDown
-                  size={15}
-                  className={`transition ${
-                    showStatusFilter ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
-
-              {showStatusFilter && (
-                <>
-                  <button
-                    type="button"
-                    aria-label="Close status filter"
-                    onClick={() => setShowStatusFilter(false)}
-                    className="fixed inset-0 z-10 cursor-default"
-                  />
-
-                  <div className="absolute right-0 top-12 z-20 w-44 rounded-xl border border-white/10 bg-[#151c2c] p-1.5 shadow-2xl">
-                    {[
-                      { value: "all", label: "Semua Status" },
-                      { value: "active", label: "Active" },
-                      { value: "suspended", label: "Suspended" },
-                    ].map((item) => (
-                      <button
-                        key={item.value}
-                        type="button"
-                        onClick={() => {
-                          setStatusFilter(item.value);
-                          setShowStatusFilter(false);
-                        }}
-                        className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-xs transition ${
-                          statusFilter === item.value
-                            ? "bg-purple-500/10 text-purple-400"
-                            : "text-slate-400 hover:bg-white/5 hover:text-white"
-                        }`}
-                      >
-                        {item.label}
-
-                        {statusFilter === item.value && (
-                          <Check size={14} />
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
+          
+          {/* Filter Status */}
+          <div style={{ position: "relative" }}>
+            <button onClick={() => { setShowStatusFilter(!showStatusFilter); setShowRoleFilter(false); }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", background: THEME.bg, border: `1px solid ${THEME.border}`, borderRadius: 12, color: THEME.text, cursor: "pointer", fontSize: "0.85rem" }}>
+              {statusFilter === "all" ? "Semua Status" : statusColor[statusFilter]?.label} <ChevronDown size={14} />
+            </button>
+            {showStatusFilter && (
+              <>
+                <div style={{ position: "fixed", inset: 0, zIndex: 10 }} onClick={() => setShowStatusFilter(false)} />
+                <div style={{ position: "absolute", right: 0, top: 44, background: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 12, padding: 6, zIndex: 20, minWidth: 160, boxShadow: "0 10px 25px rgba(0,0,0,0.5)" }}>
+                  {["all", "active", "suspended"].map(s => (
+                    <button key={s} onClick={() => { setStatusFilter(s); setShowStatusFilter(false); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 12px", background: "none", border: "none", color: statusFilter === s ? THEME.pink : THEME.muted, fontSize: "0.85rem", cursor: "pointer", borderRadius: 8 }}>
+                      {s === "all" ? "Semua Status" : statusColor[s]?.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-[#0d1422]">
-        <div className="border-b border-white/10 px-5 py-4">
-          <h2 className="text-sm font-semibold text-white">
-            Semua User
-          </h2>
-
-          <p className="mt-1 text-xs text-slate-500">
-            {filteredUsers.length} user ditemukan
-          </p>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px]">
+      <div style={{ backgroundColor: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 18, overflow: "hidden" }}>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", minWidth: 800, borderCollapse: "collapse", fontSize: "0.85rem" }}>
             <thead>
-              <tr className="border-b border-white/5 bg-white/[0.015] text-left">
-                <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  User
-                </th>
-
-                <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Role
-                </th>
-
-                <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Status
-                </th>
-
-                <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Joined
-                </th>
-
-                <th className="px-5 py-4 text-right text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Action
-                </th>
+              <tr style={{ borderBottom: `1px solid ${THEME.border}`, textAlign: "left", color: THEME.muted, background: "rgba(255,255,255,0.02)" }}>
+                <th style={{ padding: "16px 20px", fontWeight: 600 }}>User</th>
+                <th style={{ padding: "16px 20px", fontWeight: 600 }}>Role</th>
+                <th style={{ padding: "16px 20px", fontWeight: 600 }}>Status</th>
+                <th style={{ padding: "16px 20px", fontWeight: 600, textAlign: "right" }}>Action</th>
               </tr>
             </thead>
-
             <tbody>
-              {filteredUsers.length > 0 ? (
-                filteredUsers.map((user) => (
-                  <tr
-                    key={user.id}
-                    className="border-b border-white/5 transition hover:bg-white/[0.02]"
-                  >
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-500/10 text-sm font-bold text-purple-400">
-                          {user.name
-                            .split(" ")
-                            .map((name) => name[0])
-                            .slice(0, 2)
-                            .join("")}
+              {filteredUsers.map(u => {
+                const roleName = getRoleName(u);
+                return (
+                  <tr key={u.id} style={{ borderBottom: `1px solid ${THEME.border}` }}>
+                    <td style={{ padding: "16px 20px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(236,72,153,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: THEME.pink, flexShrink: 0 }}>
+                          {u.name?.charAt(0).toUpperCase()}
                         </div>
-
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-white">
-                            {user.name}
-                          </p>
-
-                          <div className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-600">
-                            <Mail size={12} />
-                            <span className="truncate">
-                              {user.email}
-                            </span>
-                          </div>
+                        <div>
+                          <p style={{ margin: 0, fontWeight: 600, color: THEME.text }}>{u.name}</p>
+                          <p style={{ margin: 0, fontSize: "0.75rem", color: THEME.muted }}>{u.email}</p>
                         </div>
                       </div>
                     </td>
-
-                    <td className="px-5 py-4">
-                      <RoleBadge role={user.role} />
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <StatusBadge status={user.status} />
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <span className="text-xs text-slate-400">
-                        {user.joinedAt}
-                      </span>
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <div className="relative flex justify-end">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setMenuId(
-                              menuId === user.id ? null : user.id
-                            )
-                          }
-                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-slate-400 transition hover:bg-white/5 hover:text-white"
-                        >
-                          <MoreHorizontal size={17} />
+                    <td style={{ padding: "16px 20px" }}><Badge type="role" value={roleName} /></td>
+                    <td style={{ padding: "16px 20px" }}><Badge type="status" value={u.status} /></td>
+                    <td style={{ padding: "16px 20px", textAlign: "right" }}>
+                      <div style={{ position: "relative", display: "inline-block" }}>
+                        <button onClick={() => setMenuId(menuId === u.id ? null : u.id)} style={{ background: "none", border: `1px solid ${THEME.border}`, borderRadius: 8, padding: "6px 8px", color: THEME.muted, cursor: "pointer" }}>
+                          <MoreHorizontal size={16} />
                         </button>
-
-                        {menuId === user.id && (
+                        {menuId === u.id && (
                           <>
-                            <button
-                              type="button"
-                              aria-label="Close menu"
-                              onClick={() => setMenuId(null)}
-                              className="fixed inset-0 z-10 cursor-default"
-                            />
-
-                            <div className="absolute right-0 top-11 z-20 w-52 rounded-xl border border-white/10 bg-[#151c2c] p-1.5 shadow-2xl">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedUser(user);
-                                  setMenuId(null);
-                                }}
-                                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-slate-300 transition hover:bg-white/5 hover:text-white"
-                              >
-                                <Eye size={15} />
-                                Lihat Detail
-                              </button>
-
-                              {user.status === "active" ? (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    suspendUser(user.id);
-                                    setMenuId(null);
-                                  }}
-                                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-rose-400 transition hover:bg-rose-500/10"
-                                >
-                                  <ShieldCheck size={15} />
-                                  Suspend User
-                                </button>
+                            <div style={{ position: "fixed", inset: 0, zIndex: 10 }} onClick={() => setMenuId(null)} />
+                            <div style={{ position: "absolute", right: 0, top: 36, background: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 12, padding: 6, zIndex: 20, minWidth: 160, boxShadow: "0 10px 25px rgba(0,0,0,0.5)", textAlign: "left" }}>
+                              <button onClick={() => { setSelectedUser(u); setMenuId(null); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "10px 12px", background: "none", border: "none", color: THEME.text, fontSize: "0.85rem", cursor: "pointer" }}><Eye size={14} /> Lihat Detail</button>
+                              {u.status === "active" ? (
+                                <button onClick={() => { suspendUser(u.id); setMenuId(null); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "10px 12px", background: "none", border: "none", color: THEME.danger, fontSize: "0.85rem", cursor: "pointer" }}><ShieldCheck size={14} /> Suspend</button>
                               ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    activateUser(user.id);
-                                    setMenuId(null);
-                                  }}
-                                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-emerald-400 transition hover:bg-emerald-500/10"
-                                >
-                                  <Check size={15} />
-                                  Activate User
-                                </button>
+                                <button onClick={() => { activateUser(u.id); setMenuId(null); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "10px 12px", background: "none", border: "none", color: THEME.success, fontSize: "0.85rem", cursor: "pointer" }}><Check size={14} /> Aktifkan</button>
                               )}
-
-                              <div className="my-1 border-t border-white/5" />
-
-                              <p className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                                Change Role
-                              </p>
-
-                              {["User", "Organizer"].map((role) => (
-                                <button
-                                  key={role}
-                                  type="button"
-                                  onClick={() =>
-                                    handleRoleChange(user.id, role)
-                                  }
-                                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-xs transition ${
-                                    user.role === role
-                                      ? "bg-purple-500/10 text-purple-400"
-                                      : "text-slate-400 hover:bg-white/5 hover:text-white"
-                                  }`}
-                                >
-                                  {role}
-
-                                  {user.role === role && (
-                                    <Check size={14} />
-                                  )}
-                                </button>
-                              ))}
+                              <div style={{ height: 1, background: THEME.border, margin: "6px 0" }} />
+                              <button onClick={() => { changeUserRole(u.id, "Penyelenggara"); setMenuId(null); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 12px", background: "none", border: "none", color: THEME.muted, fontSize: "0.85rem", cursor: "pointer" }}>Jadikan Organizer</button>
+                              <button onClick={() => { changeUserRole(u.id, "User"); setMenuId(null); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 12px", background: "none", border: "none", color: THEME.muted, fontSize: "0.85rem", cursor: "pointer" }}>Jadikan User</button>
                             </div>
                           </>
                         )}
                       </div>
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="5" className="px-5 py-16 text-center">
-                    <div className="flex flex-col items-center">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/5 text-slate-600">
-                        <Users size={20} />
-                      </div>
-
-                      <p className="mt-3 text-sm font-medium text-slate-400">
-                        User tidak ditemukan
-                      </p>
-
-                      <p className="mt-1 text-xs text-slate-600">
-                        Coba gunakan kata kunci atau filter yang berbeda.
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              )}
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
-
+      
       {selectedUser && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-white/10 bg-[#101827] shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-              <div>
-                <h2 className="text-base font-semibold text-white">
-                  Detail User
-                </h2>
-
-                <p className="mt-1 text-xs text-slate-500">
-                  Informasi akun dan hak akses pengguna
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setSelectedUser(null)}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/5 hover:text-white"
-              >
-                <X size={18} />
-              </button>
+        <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ background: THEME.surface, borderRadius: 20, border: `1px solid ${THEME.border}`, maxWidth: 500, width: "100%", padding: 24 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 800 }}>Detail User</h3>
+              <button onClick={() => setSelectedUser(null)} style={{ background: "none", border: "none", color: THEME.muted, cursor: "pointer" }}><X size={20} /></button>
             </div>
-
-            <div className="p-5">
-              <div className="flex items-center gap-4 rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-purple-500/10 text-lg font-bold text-purple-400">
-                  {selectedUser.name
-                    .split(" ")
-                    .map((name) => name[0])
-                    .slice(0, 2)
-                    .join("")}
-                </div>
-
-                <div className="min-w-0">
-                  <h3 className="text-base font-semibold text-white">
-                    {selectedUser.name}
-                  </h3>
-
-                  <p className="mt-1 text-xs text-slate-500">
-                    {selectedUser.email}
-                  </p>
-
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <RoleBadge role={selectedUser.role} />
-                    <StatusBadge status={selectedUser.status} />
-                  </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 16, padding: 16, background: THEME.bg, borderRadius: 12, marginBottom: 16 }}>
+              <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(236,72,153,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, fontWeight: 800, color: THEME.pink }}>
+                {selectedUser.name?.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <h4 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700 }}>{selectedUser.name}</h4>
+                <p style={{ margin: "4px 0 0", fontSize: "0.85rem", color: THEME.muted }}>{selectedUser.email}</p>
+                <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+                  <Badge type="role" value={getRoleName(selectedUser)} />
+                  <Badge type="status" value={selectedUser.status} />
                 </div>
               </div>
-
-              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                    User ID
-                  </p>
-
-                  <p className="mt-2 text-sm font-semibold text-white">
-                    #{selectedUser.id}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                    Joined
-                  </p>
-
-                  <p className="mt-2 text-sm font-semibold text-white">
-                    {selectedUser.joinedAt}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4 sm:col-span-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                    Email
-                  </p>
-
-                  <p className="mt-2 break-all text-sm font-semibold text-white">
-                    {selectedUser.email}
-                  </p>
-                </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+              <div style={{ background: THEME.bg, padding: 16, borderRadius: 12, border: `1px solid ${THEME.border}` }}>
+                <p style={{ margin: 0, fontSize: "0.75rem", color: THEME.muted }}>User ID</p>
+                <p style={{ margin: "4px 0 0", fontSize: "1.1rem", fontWeight: 800 }}>#{selectedUser.id}</p>
               </div>
-
-              <div className="mt-5">
-                <p className="mb-2 text-xs font-semibold text-slate-400">
-                  Ubah Role
-                </p>
-
-                <div className="grid grid-cols-2 gap-2">
-                  {["User", "Organizer"].map((role) => (
-                    <button
-                      key={role}
-                      type="button"
-                      onClick={() => {
-                        changeUserRole(selectedUser.id, role);
-
-                        setSelectedUser({
-                          ...selectedUser,
-                          role,
-                        });
-                      }}
-                      className={`rounded-xl border px-4 py-3 text-xs font-semibold transition ${
-                        selectedUser.role === role
-                          ? "border-purple-500/30 bg-purple-500/10 text-purple-400"
-                          : "border-white/10 bg-white/[0.02] text-slate-400 hover:bg-white/5 hover:text-white"
-                      }`}
-                    >
-                      {role}
-                    </button>
-                  ))}
-                </div>
+              <div style={{ background: THEME.bg, padding: 16, borderRadius: 12, border: `1px solid ${THEME.border}` }}>
+                <p style={{ margin: 0, fontSize: "0.75rem", color: THEME.muted }}>No. HP</p>
+                <p style={{ margin: "4px 0 0", fontSize: "1rem", fontWeight: 600 }}>{selectedUser.phone_number || "-"}</p>
               </div>
-
-              <div className="mt-5 flex gap-2">
-                {selectedUser.status === "active" ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      suspendUser(selectedUser.id);
-                      setSelectedUser({
-                        ...selectedUser,
-                        status: "suspended",
-                      });
-                    }}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-rose-500/10 px-4 py-3 text-xs font-bold text-rose-400 transition hover:bg-rose-500/20"
-                  >
-                    <ShieldCheck size={15} />
-                    Suspend User
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      activateUser(selectedUser.id);
-                      setSelectedUser({
-                        ...selectedUser,
-                        status: "active",
-                      });
-                    }}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-500/10 px-4 py-3 text-xs font-bold text-emerald-400 transition hover:bg-emerald-500/20"
-                  >
-                    <Check size={15} />
-                    Activate User
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedUser(null)}
-                  className="rounded-xl border border-white/10 px-5 py-3 text-xs font-semibold text-slate-400 transition hover:bg-white/5 hover:text-white"
-                >
-                  Tutup
-                </button>
-              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              {selectedUser.status === "active" ? (
+                <button onClick={() => { suspendUser(selectedUser.id); setSelectedUser(null); }} style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", background: "rgba(239,68,68,0.1)", color: THEME.danger, fontWeight: 700, cursor: "pointer" }}>Suspend</button>
+              ) : (
+                <button onClick={() => { activateUser(selectedUser.id); setSelectedUser(null); }} style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", background: THEME.success, color: "#fff", fontWeight: 700, cursor: "pointer" }}>Aktifkan</button>
+              )}
+              <button onClick={() => setSelectedUser(null)} style={{ padding: "12px 20px", borderRadius: 10, border: `1px solid ${THEME.border}`, background: "transparent", color: THEME.muted, fontWeight: 600, cursor: "pointer" }}>Tutup</button>
             </div>
           </div>
         </div>

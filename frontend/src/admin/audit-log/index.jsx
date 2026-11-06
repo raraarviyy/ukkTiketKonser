@@ -1,544 +1,148 @@
 import React, { useMemo, useState } from "react";
-import {
-  Activity,
-  CalendarDays,
-  Check,
-  ChevronDown,
-  Clock3,
-  Eye,
-  FileText,
-  Filter,
-  Search,
-  ShieldCheck,
-  User,
-  X,
-} from "lucide-react";
+import { Activity, CalendarDays, Check, ChevronDown, Clock3, Eye, Filter, Search, ShieldCheck, User, X, FileText } from "lucide-react";
 import { useAdmin } from "../context/AdminContext";
+import { THEME } from "../../theme";
 
-const actionConfig = {
-  "Approve Concert": {
-    label: "Approve Concert",
-    className: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-  },
-  "Reject Concert": {
-    label: "Reject Concert",
-    className: "bg-red-500/10 text-red-400 border-red-500/20",
-  },
-  "Cancel Concert": {
-    label: "Cancel Concert",
-    className: "bg-orange-500/10 text-orange-400 border-orange-500/20",
-  },
-  "Soft Delete Concert": {
-    label: "Soft Delete Concert",
-    className: "bg-red-500/10 text-red-400 border-red-500/20",
-  },
-  "Approve Organizer": {
-    label: "Approve Organizer",
-    className: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-  },
-  "Suspend Organizer": {
-    label: "Suspend Organizer",
-    className: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
-  },
-  "Activate Organizer": {
-    label: "Activate Organizer",
-    className: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  },
-  "Suspend User": {
-    label: "Suspend User",
-    className: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
-  },
-  "Activate User": {
-    label: "Activate User",
-    className: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  },
-  "Change User Role": {
-    label: "Change User Role",
-    className: "bg-purple-500/10 text-purple-400 border-purple-500/20",
-  },
-  "Refund Transaction": {
-    label: "Refund Transaction",
-    className: "bg-orange-500/10 text-orange-400 border-orange-500/20",
-  },
-  "Cancel Transaction": {
-    label: "Cancel Transaction",
-    className: "bg-red-500/10 text-red-400 border-red-500/20",
-  },
-  "Cancel Ticket": {
-    label: "Cancel Ticket",
-    className: "bg-red-500/10 text-red-400 border-red-500/20",
-  },
-  "Update Platform Fee": {
-    label: "Update Platform Fee",
-    className: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  },
-  "Create Announcement": {
-    label: "Create Announcement",
-    className: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  },
-  "Delete Announcement": {
-    label: "Delete Announcement",
-    className: "bg-red-500/10 text-red-400 border-red-500/20",
-  },
-  "Update Review": {
-    label: "Update Review",
-    className: "bg-purple-500/10 text-purple-400 border-purple-500/20",
-  },
-  "Delete Review": {
-    label: "Delete Review",
-    className: "bg-red-500/10 text-red-400 border-red-500/20",
-  },
+const actionColors = {
+  "Approve Concert": THEME.success, "Reject Concert": THEME.danger, "Cancel Concert": THEME.warning,
+  "Soft Delete Concert": THEME.danger, "Approve Organizer": THEME.success, "Suspend Organizer": THEME.warning,
+  "Activate Organizer": THEME.pink, "Suspend User": THEME.warning, "Activate User": THEME.pink,
+  "Change User Role": THEME.purple, "Delete User": THEME.danger, "Refund Transaction": THEME.warning,
+  "Cancel Transaction": THEME.danger, "Update Order Status": THEME.pink, "Cancel Ticket": THEME.danger,
+  "Update Platform Fee": THEME.pink, "Create Announcement": THEME.pink, "Delete Announcement": THEME.danger,
+  "Update Review": THEME.purple, "Delete Review": THEME.danger,
 };
 
-function getActionConfig(action) {
-  return (
-    actionConfig[action] || {
-      label: action,
-      className: "bg-slate-500/10 text-slate-400 border-slate-500/20",
-    }
-  );
-}
+function getActionColor(action) { return actionColors[action] || THEME.muted; }
 
-function StatCard({ title, value, icon: Icon, iconClass }) {
+function StatCard({ title, value, icon: Icon, color }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-[#0d1422] p-5">
-      <div className="flex items-center justify-between gap-4">
+    <div style={{ backgroundColor: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 16, padding: 20 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <p className="text-xs font-medium text-slate-500">{title}</p>
-          <p className="mt-2 text-2xl font-bold text-white">{value}</p>
+          <p style={{ margin: 0, fontSize: "0.8rem", color: THEME.muted, fontWeight: 500 }}>{title}</p>
+          <h3 style={{ margin: "6px 0 0", fontSize: "clamp(1.2rem, 4vw, 1.5rem)", fontWeight: 800, color: THEME.text }}>{value}</h3>
         </div>
-
-        <div
-          className={`flex h-11 w-11 items-center justify-center rounded-xl ${iconClass}`}
-        >
-          <Icon size={20} />
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: `${color}15`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <Icon size={20} color={color} />
         </div>
       </div>
     </div>
   );
 }
 
-function ActionBadge({ action }) {
-  const config = getActionConfig(action);
-
-  return (
-    <span
-      className={`inline-flex max-w-full rounded-full border px-2.5 py-1 text-[10px] font-semibold ${config.className}`}
-    >
-      {config.label}
-    </span>
-  );
-}
-
 export default function AdminAuditLog() {
   const { auditLogs } = useAdmin();
-
   const [search, setSearch] = useState("");
   const [actionFilter, setActionFilter] = useState("all");
   const [showFilter, setShowFilter] = useState(false);
-  const [selectedLog, setSelectedLog] = useState(null);
+  const [selected, setSelected] = useState(null);
 
-  const actionOptions = useMemo(() => {
-    return [...new Set(auditLogs.map((log) => log.action))];
-  }, [auditLogs]);
+  const actionOptions = useMemo(() => [...new Set(auditLogs.map(l => l.action))].sort(), [auditLogs]);
 
-  const filteredLogs = useMemo(() => {
-    return auditLogs.filter((log) => {
-      const keyword = search.toLowerCase();
-
-      const matchesSearch =
-        log.actor.toLowerCase().includes(keyword) ||
-        log.action.toLowerCase().includes(keyword) ||
-        log.target.toLowerCase().includes(keyword);
-
-      const matchesAction =
-        actionFilter === "all" || log.action === actionFilter;
-
-      return matchesSearch && matchesAction;
+  const filtered = useMemo(() => {
+    const kw = search.toLowerCase();
+    return auditLogs.filter(l => {
+      const matchSearch = (l.actor || "").toLowerCase().includes(kw) || (l.action || "").toLowerCase().includes(kw) || (l.target || "").toLowerCase().includes(kw);
+      const matchAction = actionFilter === "all" || l.action === actionFilter;
+      return matchSearch && matchAction;
     });
   }, [auditLogs, search, actionFilter]);
 
-  const todayLogs = auditLogs.filter((log) =>
-    String(log.createdAt).startsWith("2026-09-03")
-  ).length;
-
-  const uniqueActors = new Set(
-    auditLogs.map((log) => log.actor)
-  ).size;
+  const formatDate = (log) => {
+    const raw = log?.createdAt || log?.created_at;
+    if (!raw) return "-";
+    if (typeof raw === "string" && raw.includes("-") && raw.includes(":")) return raw;
+    const d = new Date(raw);
+    return isNaN(d.getTime()) ? "-" : d.toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  };
 
   return (
-    <div className="mx-auto w-full max-w-[1600px]">
-      <div className="mb-8">
-        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-purple-500/20 bg-purple-500/10 px-3 py-1.5 text-xs font-medium text-purple-300">
-          <ShieldCheck size={13} />
-          Security & Activity
+    <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 1400 }}>
+      <div>
+        <h1 style={{ margin: 0, fontSize: "clamp(1.4rem, 3vw, 1.9rem)", fontWeight: 800, color: THEME.text }}>Audit Log</h1>
+        <p style={{ margin: "6px 0 0", fontSize: "0.9rem", color: THEME.muted }}>Riwayat aktivitas penting yang dilakukan oleh Super Admin.</p>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
+        <StatCard title="Total Activity" value={auditLogs.length} icon={Activity} color={THEME.pink} />
+        <StatCard title="Action Type" value={actionOptions.length} icon={FileText} color={THEME.purple} />
+        <StatCard title="Active Actor" value={new Set(auditLogs.map(l => l.actor)).size} icon={User} color={THEME.warning} />
+      </div>
+
+      <div style={{ backgroundColor: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 18, padding: 20, display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", background: THEME.bg, border: `1px solid ${THEME.border}`, borderRadius: 12, padding: "0 14px", flex: "1 1 300px" }}>
+          <Search size={18} color={THEME.dim} />
+          <input type="text" placeholder="Cari actor, action, atau target..." value={search} onChange={e => setSearch(e.target.value)} style={{ width: "100%", background: "none", border: "none", padding: "12px", color: THEME.text, outline: "none", fontSize: "0.9rem" }} />
         </div>
-
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-            Audit Log
-          </h1>
-
-          <p className="mt-2 max-w-2xl text-sm text-slate-400">
-            Riwayat aktivitas penting yang dilakukan oleh Super Admin
-            di dalam platform.
-          </p>
+        <div style={{ position: "relative" }}>
+          <button onClick={() => setShowFilter(!showFilter)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", background: THEME.bg, border: `1px solid ${THEME.border}`, borderRadius: 12, color: THEME.text, cursor: "pointer", fontSize: "0.85rem" }}>
+            <Filter size={14} /> {actionFilter === "all" ? "Semua Aktivitas" : actionFilter} <ChevronDown size={14} />
+          </button>
+          {showFilter && (
+            <>
+              <div style={{ position: "fixed", inset: 0, zIndex: 10 }} onClick={() => setShowFilter(false)} />
+              <div style={{ position: "absolute", right: 0, top: 44, background: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 12, padding: 6, zIndex: 20, minWidth: 200, maxHeight: 250, overflowY: "auto", boxShadow: "0 10px 25px rgba(0,0,0,0.5)" }}>
+                <button onClick={() => { setActionFilter("all"); setShowFilter(false); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 12px", background: "none", border: "none", color: actionFilter === "all" ? THEME.pink : THEME.muted, fontSize: "0.85rem", cursor: "pointer", borderRadius: 8 }}>Semua Aktivitas</button>
+                {actionOptions.map(a => (
+                  <button key={a} onClick={() => { setActionFilter(a); setShowFilter(false); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 12px", background: "none", border: "none", color: actionFilter === a ? THEME.pink : THEME.muted, fontSize: "0.85rem", cursor: "pointer", borderRadius: 8 }}>{a}</button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          title="Total Activity"
-          value={auditLogs.length}
-          icon={Activity}
-          iconClass="bg-blue-500/10 text-blue-400"
-        />
-
-        <StatCard
-          title="Activity Today"
-          value={todayLogs}
-          icon={CalendarDays}
-          iconClass="bg-emerald-500/10 text-emerald-400"
-        />
-
-        <StatCard
-          title="Action Type"
-          value={actionOptions.length}
-          icon={FileText}
-          iconClass="bg-purple-500/10 text-purple-400"
-        />
-
-        <StatCard
-          title="Active Actor"
-          value={uniqueActors}
-          icon={User}
-          iconClass="bg-orange-500/10 text-orange-400"
-        />
-      </div>
-
-      <div className="mt-6 rounded-2xl border border-white/10 bg-[#0d1422] p-4 sm:p-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="relative w-full lg:max-w-lg">
-            <Search
-              size={17}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600"
-            />
-
-            <input
-              type="text"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Cari actor, action, atau target..."
-              className="h-11 w-full rounded-xl border border-white/10 bg-[#090f1b] pl-10 pr-4 text-sm text-white outline-none placeholder:text-slate-600 focus:border-blue-500/40"
-            />
-          </div>
-
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowFilter(!showFilter)}
-              className="flex h-11 w-full items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.02] px-4 text-xs font-semibold text-slate-300 transition hover:bg-white/5 hover:text-white sm:w-56"
-            >
-              <span className="flex items-center gap-2">
-                <Filter size={14} />
-
-                {actionFilter === "all"
-                  ? "Semua Aktivitas"
-                  : actionFilter}
-              </span>
-
-              <ChevronDown
-                size={15}
-                className={`transition ${
-                  showFilter ? "rotate-180" : ""
-                }`}
-              />
-            </button>
-
-            {showFilter && (
-              <>
-                <button
-                  type="button"
-                  aria-label="Close filter"
-                  onClick={() => setShowFilter(false)}
-                  className="fixed inset-0 z-10 cursor-default"
-                />
-
-                <div className="absolute right-0 top-12 z-20 max-h-80 w-64 overflow-y-auto rounded-xl border border-white/10 bg-[#151c2c] p-1.5 shadow-2xl">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActionFilter("all");
-                      setShowFilter(false);
-                    }}
-                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-xs transition ${
-                      actionFilter === "all"
-                        ? "bg-blue-500/10 text-blue-400"
-                        : "text-slate-400 hover:bg-white/5 hover:text-white"
-                    }`}
-                  >
-                    Semua Aktivitas
-
-                    {actionFilter === "all" && (
-                      <Check size={14} />
-                    )}
-                  </button>
-
-                  {actionOptions.map((action) => (
-                    <button
-                      key={action}
-                      type="button"
-                      onClick={() => {
-                        setActionFilter(action);
-                        setShowFilter(false);
-                      }}
-                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-xs transition ${
-                        actionFilter === action
-                          ? "bg-blue-500/10 text-blue-400"
-                          : "text-slate-400 hover:bg-white/5 hover:text-white"
-                      }`}
-                    >
-                      <span className="truncate">{action}</span>
-
-                      {actionFilter === action && (
-                        <Check size={14} className="shrink-0" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-[#0d1422]">
-        <div className="border-b border-white/10 bg-white/[0.02] px-5 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-semibold text-white">
-                Activity History
-              </h2>
-
-              <p className="mt-1 text-[10px] text-slate-600">
-                Semua aktivitas administratif tercatat di sini.
-              </p>
-            </div>
-
-            <div className="hidden items-center gap-2 text-[10px] text-slate-600 sm:flex">
-              <ShieldCheck size={13} />
-              Protected Log
-            </div>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[850px]">
+      <div style={{ backgroundColor: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 18, overflow: "hidden" }}>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", minWidth: 700, borderCollapse: "collapse", fontSize: "0.85rem" }}>
             <thead>
-              <tr className="border-b border-white/10">
-                <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Actor
-                </th>
-
-                <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Action
-                </th>
-
-                <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Target
-                </th>
-
-                <th className="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Date & Time
-                </th>
-
-                <th className="px-5 py-4 text-right text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Detail
-                </th>
+              <tr style={{ borderBottom: `1px solid ${THEME.border}`, textAlign: "left", color: THEME.muted, background: "rgba(255,255,255,0.02)" }}>
+                <th style={{ padding: "16px 20px", fontWeight: 600 }}>Actor</th>
+                <th style={{ padding: "16px 20px", fontWeight: 600 }}>Action</th>
+                <th style={{ padding: "16px 20px", fontWeight: 600 }}>Target</th>
+                <th style={{ padding: "16px 20px", fontWeight: 600 }}>Date</th>
+                <th style={{ padding: "16px 20px", fontWeight: 600, textAlign: "right" }}>Detail</th>
               </tr>
             </thead>
-
             <tbody>
-              {filteredLogs.length > 0 ? (
-                filteredLogs.map((log) => (
-                  <tr
-                    key={log.id}
-                    className="border-b border-white/5 transition hover:bg-white/[0.015]"
-                  >
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-purple-500/10 text-purple-400">
-                          <ShieldCheck size={15} />
-                        </div>
-
-                        <div>
-                          <p className="text-xs font-semibold text-white">
-                            {log.actor}
-                          </p>
-
-                          <p className="mt-1 text-[10px] text-slate-600">
-                            Administrator
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <ActionBadge action={log.action} />
-                    </td>
-
-                    <td className="max-w-[260px] px-5 py-4">
-                      <p className="truncate text-xs font-medium text-slate-300">
-                        {log.target}
-                      </p>
-                    </td>
-
-                    <td className="whitespace-nowrap px-5 py-4">
-                      <div className="flex items-center gap-2 text-xs text-slate-500">
-                        <Clock3 size={13} />
-                        {log.createdAt}
-                      </div>
-                    </td>
-
-                    <td className="px-5 py-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedLog(log)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-slate-400 transition hover:bg-white/5 hover:text-white"
-                      >
-                        <Eye size={15} />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="5" className="px-5 py-16 text-center">
-                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-white/5 text-slate-600">
-                      <Activity size={20} />
+              {filtered.map(log => (
+                <tr key={log.id} style={{ borderBottom: `1px solid ${THEME.border}` }}>
+                  <td style={{ padding: "16px 20px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(236,72,153,0.1)", display: "flex", alignItems: "center", justifyContent: "center", color: THEME.pink }}><ShieldCheck size={14} /></div>
+                      <span style={{ fontWeight: 600, color: THEME.text }}>{log.actor}</span>
                     </div>
-
-                    <p className="mt-3 text-sm font-medium text-slate-400">
-                      Aktivitas tidak ditemukan
-                    </p>
-
-                    <p className="mt-1 text-xs text-slate-600">
-                      Coba gunakan kata kunci atau filter yang
-                      berbeda.
-                    </p>
+                  </td>
+                  <td style={{ padding: "16px 20px" }}>
+                    <span style={{ padding: "4px 10px", borderRadius: 20, fontSize: "0.7rem", fontWeight: 700, backgroundColor: `${getActionColor(log.action)}15`, color: getActionColor(log.action), display: "inline-block" }}>{log.action}</span>
+                  </td>
+                  <td style={{ padding: "16px 20px", color: THEME.muted }}>{log.target}</td>
+                  <td style={{ padding: "16px 20px", color: THEME.muted, whiteSpace: "nowrap" }}>{formatDate(log)}</td>
+                  <td style={{ padding: "16px 20px", textAlign: "right" }}>
+                    <button onClick={() => setSelected(log)} style={{ background: "none", border: `1px solid ${THEME.border}`, borderRadius: 8, padding: "6px 8px", color: THEME.muted, cursor: "pointer" }}><Eye size={16} /></button>
                   </td>
                 </tr>
-              )}
+              ))}
             </tbody>
           </table>
         </div>
-
-        <div className="border-t border-white/5 px-5 py-4">
-          <p className="text-[10px] text-slate-600">
-            Menampilkan{" "}
-            <span className="font-semibold text-slate-400">
-              {filteredLogs.length}
-            </span>{" "}
-            dari{" "}
-            <span className="font-semibold text-slate-400">
-              {auditLogs.length}
-            </span>{" "}
-            aktivitas
-          </p>
-        </div>
       </div>
 
-      {selectedLog && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-[#101827] shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-              <div>
-                <h2 className="text-base font-semibold text-white">
-                  Activity Detail
-                </h2>
-
-                <p className="mt-1 text-xs text-slate-500">
-                  Informasi aktivitas administrator
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setSelectedLog(null)}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/5 hover:text-white"
-              >
-                <X size={18} />
-              </button>
+      {selected && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ background: THEME.surface, borderRadius: 20, border: `1px solid ${THEME.border}`, maxWidth: 450, width: "100%", padding: 24 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 800 }}>Detail Aktivitas</h3>
+              <button onClick={() => setSelected(null)} style={{ background: "none", border: "none", color: THEME.muted, cursor: "pointer" }}><X size={20} /></button>
             </div>
-
-            <div className="p-5">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-500/10 text-purple-400">
-                  <ShieldCheck size={19} />
-                </div>
-
-                <div>
-                  <p className="text-sm font-semibold text-white">
-                    {selectedLog.actor}
-                  </p>
-
-                  <p className="mt-1 text-[10px] text-slate-600">
-                    Administrator
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-5 rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Action
-                </p>
-
-                <div className="mt-2">
-                  <ActionBadge action={selectedLog.action} />
-                </div>
-              </div>
-
-              <div className="mt-3 rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Target
-                </p>
-
-                <p className="mt-2 break-words text-sm font-medium text-white">
-                  {selectedLog.target}
-                </p>
-              </div>
-
-              <div className="mt-3 rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Timestamp
-                </p>
-
-                <div className="mt-2 flex items-center gap-2 text-sm text-slate-300">
-                  <CalendarDays size={15} className="text-blue-400" />
-                  {selectedLog.createdAt}
-                </div>
-              </div>
-
-              <div className="mt-4 flex items-center gap-2 rounded-xl border border-emerald-500/10 bg-emerald-500/5 px-4 py-3">
-                <Check
-                  size={15}
-                  className="shrink-0 text-emerald-400"
-                />
-
-                <p className="text-xs leading-5 text-slate-400">
-                  Aktivitas ini tercatat sebagai bagian dari
-                  audit trail platform.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setSelectedLog(null)}
-                className="mt-5 w-full rounded-xl border border-white/10 px-4 py-3 text-xs font-semibold text-slate-400 transition hover:bg-white/5 hover:text-white"
-              >
-                Tutup
-              </button>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div><span style={{ fontSize: "0.75rem", color: THEME.muted }}>Actor</span><p style={{ margin: "4px 0 0", fontWeight: 600 }}>{selected.actor}</p></div>
+              <div><span style={{ fontSize: "0.75rem", color: THEME.muted }}>Action</span><p style={{ margin: "4px 0 0", fontWeight: 600, color: getActionColor(selected.action) }}>{selected.action}</p></div>
+              <div><span style={{ fontSize: "0.75rem", color: THEME.muted }}>Target</span><p style={{ margin: "4px 0 0", fontWeight: 600 }}>{selected.target}</p></div>
+              <div><span style={{ fontSize: "0.75rem", color: THEME.muted }}>Waktu</span><p style={{ margin: "4px 0 0", fontWeight: 600 }}>{formatDate(selected)}</p></div>
             </div>
+            <button onClick={() => setSelected(null)} style={{ width: "100%", marginTop: 24, padding: 12, borderRadius: 10, border: `1px solid ${THEME.border}`, background: "transparent", color: THEME.text, fontWeight: 600, cursor: "pointer" }}>Tutup</button>
           </div>
         </div>
       )}

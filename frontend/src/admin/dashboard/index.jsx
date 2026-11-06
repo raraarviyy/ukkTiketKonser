@@ -6,24 +6,13 @@ import {
   CheckCircle2,
   Clock3,
   DollarSign,
+  Loader2,
   Ticket,
   TrendingUp,
-  UserRound,
   Users,
   Wallet,
   XCircle,
 } from "lucide-react";
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { useAdmin } from "../context/AdminContext";
 
 const formatCurrency = (value) =>
@@ -31,33 +20,10 @@ const formatCurrency = (value) =>
     style: "currency",
     currency: "IDR",
     maximumFractionDigits: 0,
-  }).format(value);
+  }).format(value || 0);
 
 const formatNumber = (value) =>
-  new Intl.NumberFormat("id-ID").format(value);
-
-const statusConfig = {
-  published: {
-    label: "Published",
-    className: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-  },
-  pending: {
-    label: "Pending",
-    className: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
-  },
-  rejected: {
-    label: "Rejected",
-    className: "bg-rose-500/10 text-rose-400 border-rose-500/20",
-  },
-  cancelled: {
-    label: "Cancelled",
-    className: "bg-orange-500/10 text-orange-400 border-orange-500/20",
-  },
-  deleted: {
-    label: "Deleted",
-    className: "bg-slate-500/10 text-slate-400 border-slate-500/20",
-  },
-};
+  new Intl.NumberFormat("id-ID").format(value || 0);
 
 function StatCard({
   title,
@@ -119,49 +85,67 @@ function SectionHeader({ title, description }) {
   );
 }
 
-function CustomTooltip({ active, payload, label }) {
-  if (!active || !payload || !payload.length) {
-    return null;
+export default function AdminDashboard() {
+  const { stats, events, orders, loading } = useAdmin();
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "300px",
+          flexDirection: "column",
+          gap: "12px",
+        }}
+      >
+        <Loader2
+          size={32}
+          color="#a855f7"
+          style={{ animation: "spin 1s linear infinite" }}
+        />
+        <span style={{ color: "#94a3b8", fontSize: "14px" }}>
+          Memuat data dashboard...
+        </span>
+      </div>
+    );
   }
 
-  return (
-    <div className="rounded-xl border border-white/10 bg-[#111827] px-4 py-3 shadow-2xl">
-      <p className="mb-2 text-xs font-medium text-slate-400">{label}</p>
-
-      {payload.map((item) => (
-        <div key={item.dataKey} className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-white">
-            {item.dataKey === "revenue"
-              ? formatCurrency(item.value)
-              : formatNumber(item.value)}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-export default function AdminDashboard() {
-  const {
-    stats,
-    events,
-    organizers,
-    transactions,
-    tickets,
-  } = useAdmin();
+  const overview = stats?.overview || {};
+  const eventsBreakdown = stats?.events_breakdown || {};
+  const usersBreakdown = stats?.users_breakdown || {};
+  const recentTransactions = stats?.recent_transactions || [];
+  const topPerformingEvents = stats?.top_performing_events || [];
 
   const recentEvents = [...events]
-    .filter((event) => event.status !== "deleted")
-    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .sort(
+      (a, b) =>
+        new Date(b.event_date || b.created_at) -
+        new Date(a.event_date || a.created_at)
+    )
     .slice(0, 5);
 
-  const recentTransactions = transactions.slice(0, 5);
+  const recentOrders = recentTransactions.slice(0, 5);
 
-  const topOrganizers = [...organizers]
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 5);
-
-  const chartData = stats.monthlySales || [];
+  const statusConfig = {
+    approved: {
+      label: "Approved",
+      className: "border-emerald-500/20 bg-emerald-500/10 text-emerald-400",
+    },
+    pending: {
+      label: "Pending",
+      className: "border-yellow-500/20 bg-yellow-500/10 text-yellow-400",
+    },
+    rejected: {
+      label: "Rejected",
+      className: "border-rose-500/20 bg-rose-500/10 text-rose-400",
+    },
+    cancelled: {
+      label: "Cancelled",
+      className: "border-orange-500/20 bg-orange-500/10 text-orange-400",
+    },
+  };
 
   return (
     <div className="mx-auto w-full max-w-[1600px]">
@@ -178,15 +162,19 @@ export default function AdminDashboard() {
             </h1>
 
             <p className="mt-2 max-w-2xl text-sm text-slate-400">
-              Pantau performa platform, penjualan tiket, organizer, konser,
-              transaksi, dan pendapatan secara keseluruhan.
+              Pantau performa platform, penjualan tiket, event, transaksi, dan
+              pendapatan secara keseluruhan.
             </p>
           </div>
 
           <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#0d1422] px-4 py-2.5">
             <CalendarDays size={16} className="text-purple-400" />
             <span className="text-xs font-medium text-slate-300">
-              3 September 2026
+              {new Date().toLocaleDateString("id-ID", {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })}
             </span>
           </div>
         </div>
@@ -195,38 +183,34 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           title="Total User"
-          value={formatNumber(stats.totalUsers)}
+          value={formatNumber(overview.totalUsers)}
           description="pengguna terdaftar"
           icon={Users}
           iconClass="bg-blue-500/10 text-blue-400"
-          trend="+12.5%"
         />
 
         <StatCard
-          title="Total Organizer"
-          value={formatNumber(stats.totalOrganizers)}
-          description="organizer terdaftar"
-          icon={UserRound}
-          iconClass="bg-purple-500/10 text-purple-400"
-          trend="+8.2%"
-        />
-
-        <StatCard
-          title="Total Concert"
-          value={formatNumber(stats.totalEvents)}
+          title="Total Event"
+          value={formatNumber(overview.totalEvents)}
           description="event di platform"
           icon={CalendarDays}
           iconClass="bg-cyan-500/10 text-cyan-400"
-          trend="+15.4%"
         />
 
         <StatCard
           title="Tiket Terjual"
-          value={formatNumber(stats.totalTicketsSold)}
+          value={formatNumber(overview.totalTicketsSold)}
           description="seluruh event"
           icon={Ticket}
           iconClass="bg-emerald-500/10 text-emerald-400"
-          trend="+18.7%"
+        />
+
+        <StatCard
+          title="Total Pendapatan"
+          value={formatCurrency(overview.totalRevenue)}
+          description="transaksi lunas"
+          icon={TrendingUp}
+          iconClass="bg-purple-500/10 text-purple-400"
         />
       </div>
 
@@ -238,9 +222,9 @@ export default function AdminDashboard() {
             </div>
 
             <div>
-              <p className="text-xs text-slate-500">GMV</p>
+              <p className="text-xs text-slate-500">Pendapatan Hari Ini</p>
               <p className="mt-1 text-lg font-bold text-white">
-                {formatCurrency(stats.gmv)}
+                {formatCurrency(overview.todayRevenue)}
               </p>
             </div>
           </div>
@@ -253,9 +237,9 @@ export default function AdminDashboard() {
             </div>
 
             <div>
-              <p className="text-xs text-slate-500">Platform Revenue</p>
+              <p className="text-xs text-slate-500">Order Lunas Hari Ini</p>
               <p className="mt-1 text-lg font-bold text-white">
-                {formatCurrency(stats.platformRevenue)}
+                {formatNumber(overview.paidOrdersToday)}
               </p>
             </div>
           </div>
@@ -268,110 +252,11 @@ export default function AdminDashboard() {
             </div>
 
             <div>
-              <p className="text-xs text-slate-500">Settlement EO</p>
+              <p className="text-xs text-slate-500">Total Orders</p>
               <p className="mt-1 text-lg font-bold text-white">
-                {formatCurrency(stats.settlement)}
+                {formatNumber(overview.totalOrders)}
               </p>
             </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <div className="rounded-2xl border border-white/10 bg-[#0d1422] p-5 xl:col-span-2">
-          <SectionHeader
-            title="Revenue Overview"
-            description="Perkembangan GMV platform dalam beberapa bulan terakhir"
-          />
-
-          <div className="h-[310px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
-                data={chartData}
-                margin={{ top: 10, right: 5, left: 0, bottom: 0 }}
-              >
-                <defs>
-                  <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#a855f7" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="#a855f7" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="rgba(255,255,255,0.06)"
-                  vertical={false}
-                />
-
-                <XAxis
-                  dataKey="month"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: "#64748b", fontSize: 11 }}
-                />
-
-                <YAxis
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: "#64748b", fontSize: 11 }}
-                  tickFormatter={(value) => `${value / 1000000}M`}
-                />
-
-                <Tooltip content={<CustomTooltip />} />
-
-                <Area
-                  type="monotone"
-                  dataKey="revenue"
-                  stroke="#a855f7"
-                  strokeWidth={2.5}
-                  fill="url(#revenueGradient)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-white/10 bg-[#0d1422] p-5">
-          <SectionHeader
-            title="Ticket Sales"
-            description="Jumlah tiket terjual setiap bulan"
-          />
-
-          <div className="h-[310px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={chartData}
-                margin={{ top: 10, right: 5, left: -15, bottom: 0 }}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="rgba(255,255,255,0.06)"
-                  vertical={false}
-                />
-
-                <XAxis
-                  dataKey="month"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: "#64748b", fontSize: 11 }}
-                />
-
-                <YAxis
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: "#64748b", fontSize: 11 }}
-                />
-
-                <Tooltip content={<CustomTooltip />} />
-
-                <Bar
-                  dataKey="sales"
-                  fill="#38bdf8"
-                  radius={[6, 6, 0, 0]}
-                  maxBarSize={32}
-                />
-              </BarChart>
-            </ResponsiveContainer>
           </div>
         </div>
       </div>
@@ -379,22 +264,22 @@ export default function AdminDashboard() {
       <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
         <div className="rounded-2xl border border-white/10 bg-[#0d1422] p-5">
           <SectionHeader
-            title="Event Performance"
-            description="Konser dengan penjualan tiket tertinggi"
+            title="Top Performing Events"
+            description="Event dengan order terbanyak di platform"
           />
 
           <div className="space-y-3">
-            {stats.eventSales?.length > 0 ? (
-              stats.eventSales.map((event, index) => {
-                const maxSold = Math.max(
-                  ...stats.eventSales.map((item) => item.sold),
+            {topPerformingEvents.length > 0 ? (
+              topPerformingEvents.map((event, index) => {
+                const maxOrders = Math.max(
+                  ...topPerformingEvents.map((e) => e._count?.orders || 0),
                   1
                 );
-
-                const percentage = Math.round((event.sold / maxSold) * 100);
+                const count = event._count?.orders || 0;
+                const percentage = Math.round((count / maxOrders) * 100);
 
                 return (
-                  <div key={`${event.name}-${index}`}>
+                  <div key={event.id}>
                     <div className="mb-2 flex items-center justify-between gap-3">
                       <div className="flex min-w-0 items-center gap-3">
                         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/5 text-xs font-bold text-slate-400">
@@ -402,12 +287,12 @@ export default function AdminDashboard() {
                         </span>
 
                         <span className="truncate text-sm font-medium text-slate-300">
-                          {event.name}
+                          {event.title}
                         </span>
                       </div>
 
                       <span className="shrink-0 text-xs font-semibold text-white">
-                        {formatNumber(event.sold)}
+                        {formatNumber(count)} orders
                       </span>
                     </div>
 
@@ -438,11 +323,11 @@ export default function AdminDashboard() {
             <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
               <div className="flex items-center gap-2">
                 <CheckCircle2 size={16} className="text-emerald-400" />
-                <span className="text-xs text-slate-400">Paid</span>
+                <span className="text-xs text-slate-400">Paid Orders</span>
               </div>
 
               <p className="mt-3 text-xl font-bold text-white">
-                {formatNumber(stats.paidTransactions)}
+                {formatNumber(overview.totalOrders - (overview.pendingOrders || 0) - (overview.cancelledOrders || 0))}
               </p>
 
               <p className="mt-1 text-[11px] text-slate-500">
@@ -457,7 +342,7 @@ export default function AdminDashboard() {
               </div>
 
               <p className="mt-3 text-xl font-bold text-white">
-                {formatNumber(stats.pendingTransactions)}
+                {formatNumber(overview.pendingOrders)}
               </p>
 
               <p className="mt-1 text-[11px] text-slate-500">
@@ -468,30 +353,30 @@ export default function AdminDashboard() {
             <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
               <div className="flex items-center gap-2">
                 <CalendarDays size={16} className="text-purple-400" />
-                <span className="text-xs text-slate-400">Pending Event</span>
+                <span className="text-xs text-slate-400">Pending Events</span>
               </div>
 
               <p className="mt-3 text-xl font-bold text-white">
-                {formatNumber(stats.pendingEvents)}
+                {formatNumber(eventsBreakdown.pending_moderation)}
               </p>
 
               <p className="mt-1 text-[11px] text-slate-500">
-                membutuhkan approval
+                butuh approval
               </p>
             </div>
 
             <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
               <div className="flex items-center gap-2">
-                <Ticket size={16} className="text-cyan-400" />
-                <span className="text-xs text-slate-400">Check-in</span>
+                <XCircle size={16} className="text-rose-400" />
+                <span className="text-xs text-slate-400">Cancelled</span>
               </div>
 
               <p className="mt-3 text-xl font-bold text-white">
-                {formatNumber(stats.totalCheckedIn)}
+                {formatNumber(overview.cancelledOrders)}
               </p>
 
               <p className="mt-1 text-[11px] text-slate-500">
-                tiket telah digunakan
+                order dibatalkan
               </p>
             </div>
           </div>
@@ -501,8 +386,8 @@ export default function AdminDashboard() {
       <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
         <div className="rounded-2xl border border-white/10 bg-[#0d1422] p-5">
           <SectionHeader
-            title="Recent Concerts"
-            description="Konser terbaru yang terdaftar di platform"
+            title="Recent Events"
+            description="Event terbaru yang terdaftar di platform"
           />
 
           <div className="overflow-x-auto">
@@ -510,7 +395,7 @@ export default function AdminDashboard() {
               <thead>
                 <tr className="border-b border-white/5 text-left">
                   <th className="pb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-600">
-                    Concert
+                    Event
                   </th>
                   <th className="pb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-600">
                     Organizer
@@ -519,7 +404,7 @@ export default function AdminDashboard() {
                     Status
                   </th>
                   <th className="pb-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-600">
-                    Sold
+                    Orders
                   </th>
                 </tr>
               </thead>
@@ -536,15 +421,21 @@ export default function AdminDashboard() {
                     >
                       <td className="py-4">
                         <p className="max-w-[190px] truncate text-sm font-medium text-white">
-                          {event.name}
+                          {event.title}
                         </p>
                         <p className="mt-1 text-[11px] text-slate-500">
-                          {event.date}
+                          {event.event_date
+                            ? new Date(event.event_date).toLocaleDateString(
+                                "id-ID"
+                              )
+                            : "-"}
                         </p>
                       </td>
 
                       <td className="py-4 text-xs text-slate-400">
-                        {event.organizer}
+                        {event.organizer?.name ||
+                          event.organizer?.organization_name ||
+                          "-"}
                       </td>
 
                       <td className="py-4">
@@ -556,7 +447,7 @@ export default function AdminDashboard() {
                       </td>
 
                       <td className="py-4 text-right text-xs font-semibold text-slate-300">
-                        {formatNumber(event.ticketsSold)}
+                        {formatNumber(event._count?.orders || 0)}
                       </td>
                     </tr>
                   );
@@ -573,93 +464,51 @@ export default function AdminDashboard() {
           />
 
           <div className="space-y-2">
-            {recentTransactions.map((transaction) => (
-              <div
-                key={transaction.id}
-                className="flex items-center gap-3 rounded-xl border border-white/5 bg-white/[0.02] p-3"
-              >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400">
-                  <Ticket size={16} />
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-semibold text-white">
-                    {transaction.id}
-                  </p>
-
-                  <p className="mt-1 truncate text-[11px] text-slate-500">
-                    {transaction.buyer} · {transaction.event}
-                  </p>
-                </div>
-
-                <div className="shrink-0 text-right">
-                  <p className="text-xs font-semibold text-white">
-                    {formatCurrency(transaction.amount)}
-                  </p>
-
-                  <span
-                    className={`mt-1 inline-block text-[10px] font-medium ${
-                      transaction.status === "paid"
-                        ? "text-emerald-400"
-                        : transaction.status === "refunded"
-                        ? "text-rose-400"
-                        : transaction.status === "cancelled"
-                        ? "text-orange-400"
-                        : "text-yellow-400"
-                    }`}
-                  >
-                    {transaction.status}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-6 rounded-2xl border border-white/10 bg-[#0d1422] p-5">
-        <SectionHeader
-          title="Top Organizer"
-          description="Organizer berdasarkan total revenue"
-        />
-
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
-          {topOrganizers.map((organizer, index) => (
-            <div
-              key={organizer.id}
-              className="rounded-xl border border-white/5 bg-white/[0.02] p-4"
-            >
-              <div className="flex items-center justify-between">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-500/10 text-xs font-bold text-purple-400">
-                  #{index + 1}
-                </span>
-
-                <span
-                  className={`rounded-full border px-2 py-1 text-[9px] font-semibold ${
-                    organizer.status === "active"
-                      ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
-                      : organizer.status === "pending"
-                      ? "border-yellow-500/20 bg-yellow-500/10 text-yellow-400"
-                      : "border-rose-500/20 bg-rose-500/10 text-rose-400"
-                  }`}
+            {recentOrders.length > 0 ? (
+              recentOrders.map((order) => (
+                <div
+                  key={order.id}
+                  className="flex items-center gap-3 rounded-xl border border-white/5 bg-white/[0.02] p-3"
                 >
-                  {organizer.status}
-                </span>
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400">
+                    <Ticket size={16} />
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-semibold text-white">
+                      {order.order_code || `#${order.id}`}
+                    </p>
+
+                    <p className="mt-1 truncate text-[11px] text-slate-500">
+                      {order.user?.name} · {order.event?.title}
+                    </p>
+                  </div>
+
+                  <div className="shrink-0 text-right">
+                    <p className="text-xs font-semibold text-white">
+                      {formatCurrency(order.total)}
+                    </p>
+
+                    <span
+                      className={`mt-1 inline-block text-[10px] font-medium ${
+                        order.status === "paid"
+                          ? "text-emerald-400"
+                          : order.status === "cancelled"
+                          ? "text-rose-400"
+                          : "text-yellow-400"
+                      }`}
+                    >
+                      {order.status}
+                    </span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="flex h-48 items-center justify-center text-sm text-slate-500">
+                Belum ada transaksi.
               </div>
-
-              <p className="mt-4 truncate text-sm font-semibold text-white">
-                {organizer.name}
-              </p>
-
-              <p className="mt-1 text-xs text-slate-500">
-                {formatNumber(organizer.concerts)} konser
-              </p>
-
-              <p className="mt-3 text-sm font-bold text-purple-400">
-                {formatCurrency(organizer.revenue)}
-              </p>
-            </div>
-          ))}
+            )}
+          </div>
         </div>
       </div>
 
@@ -673,7 +522,22 @@ export default function AdminDashboard() {
             <div>
               <p className="text-xs text-slate-500">Pending Approval</p>
               <p className="mt-1 text-lg font-bold text-white">
-                {stats.pendingEvents} Concert
+                {eventsBreakdown.pending_moderation || 0} Event
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-emerald-500/10 bg-emerald-500/[0.03] p-5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400">
+              <CheckCircle2 size={18} />
+            </div>
+
+            <div>
+              <p className="text-xs text-slate-500">Event Approved</p>
+              <p className="mt-1 text-lg font-bold text-white">
+                {eventsBreakdown.approved || 0} Event
               </p>
             </div>
           </div>
@@ -686,24 +550,9 @@ export default function AdminDashboard() {
             </div>
 
             <div>
-              <p className="text-xs text-slate-500">Refund</p>
+              <p className="text-xs text-slate-500">Event Rejected</p>
               <p className="mt-1 text-lg font-bold text-white">
-                {formatCurrency(stats.refundAmount)}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-emerald-500/10 bg-emerald-500/[0.03] p-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400">
-              <Wallet size={18} />
-            </div>
-
-            <div>
-              <p className="text-xs text-slate-500">Settlement</p>
-              <p className="mt-1 text-lg font-bold text-white">
-                {formatCurrency(stats.settlement)}
+                {eventsBreakdown.rejected || 0} Event
               </p>
             </div>
           </div>
@@ -712,7 +561,7 @@ export default function AdminDashboard() {
 
       <div className="mt-6 pb-4 text-center">
         <p className="text-[11px] text-slate-600">
-          TicketHub Admin Platform · Super Admin Dashboard
+          Tiket Konser Admin Platform · Super Admin Dashboard
         </p>
       </div>
     </div>

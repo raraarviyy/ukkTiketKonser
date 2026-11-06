@@ -10,70 +10,50 @@ import {
   Receipt,
   RefreshCcw,
   Search,
-  Ticket,
   X,
   XCircle,
 } from "lucide-react";
 import { useAdmin } from "../context/AdminContext";
+import { THEME } from "../../theme";
 
 const formatCurrency = (value) =>
-  new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(value);
+  new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(value || 0);
 
-const formatNumber = (value) =>
-  new Intl.NumberFormat("id-ID").format(value);
+const formatDate = (value) => {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "-";
+  return d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+};
 
 const statusConfig = {
-  paid: {
-    label: "Paid",
-    className:
-      "border-emerald-500/20 bg-emerald-500/10 text-emerald-400",
-  },
-  pending: {
-    label: "Pending",
-    className:
-      "border-yellow-500/20 bg-yellow-500/10 text-yellow-400",
-  },
-  refunded: {
-    label: "Refunded",
-    className:
-      "border-blue-500/20 bg-blue-500/10 text-blue-400",
-  },
-  cancelled: {
-    label: "Cancelled",
-    className:
-      "border-rose-500/20 bg-rose-500/10 text-rose-400",
-  },
+  paid: { label: "Paid", color: THEME.success, bg: "rgba(16,185,129,0.1)" },
+  pending: { label: "Pending", color: THEME.warning, bg: "rgba(245,158,11,0.1)" },
+  refunded: { label: "Refunded", color: THEME.purple, bg: "rgba(168,85,247,0.1)" },
+  cancelled: { label: "Cancelled", color: THEME.danger, bg: "rgba(239,68,68,0.1)" },
+  failed: { label: "Failed", color: THEME.danger, bg: "rgba(239,68,68,0.1)" },
+  expired: { label: "Expired", color: THEME.muted, bg: "rgba(156,163,175,0.1)" },
 };
 
 function StatusBadge({ status }) {
   const config = statusConfig[status] || statusConfig.pending;
-
   return (
-    <span
-      className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold ${config.className}`}
-    >
+    <span style={{ padding: "4px 10px", borderRadius: 20, fontSize: "0.7rem", fontWeight: 700, backgroundColor: config.bg, color: config.color, display: "inline-block" }}>
       {config.label}
     </span>
   );
 }
 
-function StatCard({ title, value, icon: Icon, iconClass }) {
+function StatCard({ title, value, icon: Icon, color }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-[#0d1422] p-5">
-      <div className="flex items-center justify-between">
+    <div style={{ backgroundColor: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 16, padding: 20 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <p className="text-xs font-medium text-slate-500">{title}</p>
-          <p className="mt-2 text-2xl font-bold text-white">{value}</p>
+          <p style={{ margin: 0, fontSize: "0.8rem", color: THEME.muted, fontWeight: 500 }}>{title}</p>
+          <h3 style={{ margin: "6px 0 0", fontSize: "clamp(1.2rem, 4vw, 1.5rem)", fontWeight: 800, color: THEME.text }}>{value}</h3>
         </div>
-
-        <div
-          className={`flex h-11 w-11 items-center justify-center rounded-xl ${iconClass}`}
-        >
-          <Icon size={20} />
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: `${color}15`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <Icon size={20} color={color} />
         </div>
       </div>
     </div>
@@ -81,653 +61,176 @@ function StatCard({ title, value, icon: Icon, iconClass }) {
 }
 
 export default function AdminOrders() {
-  const {
-    transactions,
-    refundTransaction,
-    cancelTransaction,
-  } = useAdmin();
-
+  const { orders, updateOrderStatus } = useAdmin();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [paymentFilter, setPaymentFilter] = useState("all");
-  const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [selected, setSelected] = useState(null);
   const [menuId, setMenuId] = useState(null);
-  const [showStatusFilter, setShowStatusFilter] = useState(false);
-  const [showPaymentFilter, setShowPaymentFilter] = useState(false);
+  const [showFilter, setShowFilter] = useState(false);
 
-  const filteredTransactions = useMemo(() => {
-    return transactions.filter((transaction) => {
-      const keyword = search.toLowerCase();
+  const transactions = useMemo(() => {
+    return (Array.isArray(orders) ? orders : []).map((o) => ({
+      key: o.id,
+      orderId: o.id,
+      id: o.order_code || o.invoice_id || `ORD-${o.id}`,
+      buyer: o.user?.name || "-",
+      event: o.event?.title || "-",
+      amount: Number(o.total || 0),
+      paymentMethod: o.payment_method || "-",
+      status: o.status,
+      createdAt: formatDate(o.created_at),
+    }));
+  }, [orders]);
 
-      const matchesSearch =
-        transaction.id.toLowerCase().includes(keyword) ||
-        transaction.buyer.toLowerCase().includes(keyword) ||
-        transaction.event.toLowerCase().includes(keyword);
-
-      const matchesStatus =
-        statusFilter === "all" ||
-        transaction.status === statusFilter;
-
-      const matchesPayment =
-        paymentFilter === "all" ||
-        transaction.paymentMethod === paymentFilter;
-
-      return matchesSearch && matchesStatus && matchesPayment;
+  const filtered = useMemo(() => {
+    const kw = search.toLowerCase();
+    return transactions.filter((t) => {
+      const matchSearch = t.id.toLowerCase().includes(kw) || t.buyer.toLowerCase().includes(kw) || t.event.toLowerCase().includes(kw);
+      const matchStatus = statusFilter === "all" || t.status === statusFilter;
+      return matchSearch && matchStatus;
     });
-  }, [transactions, search, statusFilter, paymentFilter]);
+  }, [transactions, search, statusFilter]);
 
-  const totalAmount = transactions.reduce(
-    (total, transaction) => total + transaction.amount,
-    0
-  );
+  const totalAmount = transactions.reduce((sum, t) => sum + t.amount, 0);
+  const paidAmount = transactions.filter(t => t.status === "paid").reduce((sum, t) => sum + t.amount, 0);
+  const pendingAmount = transactions.filter(t => t.status === "pending").reduce((sum, t) => sum + t.amount, 0);
 
-  const paidAmount = transactions
-    .filter((transaction) => transaction.status === "paid")
-    .reduce((total, transaction) => total + transaction.amount, 0);
-
-  const pendingAmount = transactions
-    .filter((transaction) => transaction.status === "pending")
-    .reduce((total, transaction) => total + transaction.amount, 0);
-
-  const refundedAmount = transactions
-    .filter((transaction) => transaction.status === "refunded")
-    .reduce((total, transaction) => total + transaction.amount, 0);
-
-  const handleRefund = (id) => {
-    refundTransaction(id);
-    setMenuId(null);
-  };
-
-  const handleCancel = (id) => {
-    cancelTransaction(id);
-    setMenuId(null);
+  const handleStatus = async (t, newStatus) => {
+    if (!window.confirm(`Ubah status pesanan ${t.id} menjadi ${newStatus}?`)) return;
+    try {
+      await updateOrderStatus(t.orderId, newStatus);
+      setMenuId(null);
+    } catch (err) {
+      alert(err.message || "Gagal mengubah status");
+    }
   };
 
   return (
-    <div className="mx-auto w-full max-w-[1600px]">
-      <div className="mb-8">
-        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-300">
-          <Receipt size={13} />
-          Order Management
+    <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 1400 }}>
+      <div>
+        <h1 style={{ margin: 0, fontSize: "clamp(1.4rem, 3vw, 1.9rem)", fontWeight: 800, color: THEME.text }}>Order Management</h1>
+        <p style={{ margin: "6px 0 0", fontSize: "0.9rem", color: THEME.muted }}>Pantau seluruh transaksi, status pembayaran, dan pembatalan order.</p>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
+        <StatCard title="Total Orders" value={transactions.length} icon={Receipt} color={THEME.pink} />
+        <StatCard title="Paid" value={formatCurrency(paidAmount)} icon={Check} color={THEME.success} />
+        <StatCard title="Pending" value={formatCurrency(pendingAmount)} icon={Clock3} color={THEME.warning} />
+        <StatCard title="Total Nilai" value={formatCurrency(totalAmount)} icon={CreditCard} color={THEME.purple} />
+      </div>
+
+      <div style={{ backgroundColor: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 18, padding: 20, display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", background: THEME.bg, border: `1px solid ${THEME.border}`, borderRadius: 12, padding: "0 14px", flex: "1 1 300px" }}>
+          <Search size={18} color={THEME.dim} />
+          <input type="text" placeholder="Cari order code, pembeli, atau event..." value={search} onChange={e => setSearch(e.target.value)} style={{ width: "100%", background: "none", border: "none", padding: "12px", color: THEME.text, outline: "none", fontSize: "0.9rem" }} />
         </div>
-
-        <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-          Order Management
-        </h1>
-
-        <p className="mt-2 max-w-2xl text-sm text-slate-400">
-          Pantau seluruh transaksi pembelian tiket, status pembayaran,
-          refund, dan pembatalan order.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <StatCard
-          title="Total Orders"
-          value={formatNumber(transactions.length)}
-          icon={Receipt}
-          iconClass="bg-purple-500/10 text-purple-400"
-        />
-
-        <StatCard
-          title="Paid Amount"
-          value={formatCurrency(paidAmount)}
-          icon={Check}
-          iconClass="bg-emerald-500/10 text-emerald-400"
-        />
-
-        <StatCard
-          title="Pending Amount"
-          value={formatCurrency(pendingAmount)}
-          icon={Clock3}
-          iconClass="bg-yellow-500/10 text-yellow-400"
-        />
-
-        <StatCard
-          title="Refunded"
-          value={formatCurrency(refundedAmount)}
-          icon={RefreshCcw}
-          iconClass="bg-blue-500/10 text-blue-400"
-        />
-
-        <StatCard
-          title="Transaction Value"
-          value={formatCurrency(totalAmount)}
-          icon={CreditCard}
-          iconClass="bg-cyan-500/10 text-cyan-400"
-        />
-      </div>
-
-      <div className="mt-6 rounded-2xl border border-white/10 bg-[#0d1422] p-4 sm:p-5">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div className="relative w-full xl:max-w-lg">
-            <Search
-              size={17}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600"
-            />
-
-            <input
-              type="text"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Cari invoice, buyer, atau concert..."
-              className="h-11 w-full rounded-xl border border-white/10 bg-[#090f1b] pl-10 pr-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-purple-500/40"
-            />
-          </div>
-
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowStatusFilter(!showStatusFilter);
-                  setShowPaymentFilter(false);
-                }}
-                className="flex h-11 w-full items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.02] px-4 text-xs font-semibold text-slate-300 transition hover:bg-white/5 hover:text-white sm:w-40"
-              >
-                <span className="flex items-center gap-2">
-                  <Filter size={14} />
-
-                  {statusFilter === "all"
-                    ? "Status"
-                    : statusConfig[statusFilter]?.label}
-                </span>
-
-                <ChevronDown
-                  size={15}
-                  className={`transition ${
-                    showStatusFilter ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
-
-              {showStatusFilter && (
-                <>
-                  <button
-                    type="button"
-                    aria-label="Close status filter"
-                    onClick={() => setShowStatusFilter(false)}
-                    className="fixed inset-0 z-10 cursor-default"
-                  />
-
-                  <div className="absolute right-0 top-12 z-20 w-44 rounded-xl border border-white/10 bg-[#151c2c] p-1.5 shadow-2xl">
-                    {[
-                      { value: "all", label: "Semua Status" },
-                      { value: "paid", label: "Paid" },
-                      { value: "pending", label: "Pending" },
-                      { value: "refunded", label: "Refunded" },
-                      { value: "cancelled", label: "Cancelled" },
-                    ].map((item) => (
-                      <button
-                        key={item.value}
-                        type="button"
-                        onClick={() => {
-                          setStatusFilter(item.value);
-                          setShowStatusFilter(false);
-                        }}
-                        className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-xs transition ${
-                          statusFilter === item.value
-                            ? "bg-purple-500/10 text-purple-400"
-                            : "text-slate-400 hover:bg-white/5 hover:text-white"
-                        }`}
-                      >
-                        {item.label}
-
-                        {statusFilter === item.value && (
-                          <Check size={14} />
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowPaymentFilter(!showPaymentFilter);
-                  setShowStatusFilter(false);
-                }}
-                className="flex h-11 w-full items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.02] px-4 text-xs font-semibold text-slate-300 transition hover:bg-white/5 hover:text-white sm:w-44"
-              >
-                <span className="flex items-center gap-2">
-                  <CreditCard size={14} />
-
-                  {paymentFilter === "all"
-                    ? "Payment"
-                    : paymentFilter}
-                </span>
-
-                <ChevronDown
-                  size={15}
-                  className={`transition ${
-                    showPaymentFilter ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
-
-              {showPaymentFilter && (
-                <>
-                  <button
-                    type="button"
-                    aria-label="Close payment filter"
-                    onClick={() => setShowPaymentFilter(false)}
-                    className="fixed inset-0 z-10 cursor-default"
-                  />
-
-                  <div className="absolute right-0 top-12 z-20 w-48 rounded-xl border border-white/10 bg-[#151c2c] p-1.5 shadow-2xl">
-                    {[
-                      { value: "all", label: "Semua Payment" },
-                      { value: "QRIS", label: "QRIS" },
-                      {
-                        value: "Bank Transfer",
-                        label: "Bank Transfer",
-                      },
-                      {
-                        value: "E-Wallet",
-                        label: "E-Wallet",
-                      },
-                    ].map((item) => (
-                      <button
-                        key={item.value}
-                        type="button"
-                        onClick={() => {
-                          setPaymentFilter(item.value);
-                          setShowPaymentFilter(false);
-                        }}
-                        className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-xs transition ${
-                          paymentFilter === item.value
-                            ? "bg-purple-500/10 text-purple-400"
-                            : "text-slate-400 hover:bg-white/5 hover:text-white"
-                        }`}
-                      >
-                        {item.label}
-
-                        {paymentFilter === item.value && (
-                          <Check size={14} />
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
+        <div style={{ position: "relative" }}>
+          <button onClick={() => setShowFilter(!showFilter)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", background: THEME.bg, border: `1px solid ${THEME.border}`, borderRadius: 12, color: THEME.text, cursor: "pointer", fontSize: "0.85rem" }}>
+            <Filter size={14} /> {statusFilter === "all" ? "Semua Status" : statusConfig[statusFilter]?.label} <ChevronDown size={14} />
+          </button>
+          {showFilter && (
+            <>
+              <div style={{ position: "fixed", inset: 0, zIndex: 10 }} onClick={() => setShowFilter(false)} />
+              <div style={{ position: "absolute", right: 0, top: 44, background: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 12, padding: 6, zIndex: 20, minWidth: 160, boxShadow: "0 10px 25px rgba(0,0,0,0.5)" }}>
+                {["all", "paid", "pending", "refunded", "cancelled"].map(s => (
+                  <button key={s} onClick={() => { setStatusFilter(s); setShowFilter(false); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 12px", background: "none", border: "none", color: statusFilter === s ? THEME.pink : THEME.muted, fontSize: "0.85rem", cursor: "pointer", borderRadius: 8 }}>
+                    {s === "all" ? "Semua Status" : statusConfig[s]?.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-[#0d1422]">
-        <div className="border-b border-white/10 px-5 py-4">
-          <h2 className="text-sm font-semibold text-white">
-            Semua Transaksi
-          </h2>
-
-          <p className="mt-1 text-xs text-slate-500">
-            {filteredTransactions.length} transaksi ditemukan
-          </p>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1050px]">
+      <div style={{ backgroundColor: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 18, overflow: "hidden" }}>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", minWidth: 900, borderCollapse: "collapse", fontSize: "0.85rem" }}>
             <thead>
-              <tr className="border-b border-white/5 bg-white/[0.015] text-left">
-                <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Invoice
-                </th>
-
-                <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Buyer
-                </th>
-
-                <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Concert
-                </th>
-
-                <th className="px-5 py-4 text-right text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Amount
-                </th>
-
-                <th className="px-5 py-4 text-center text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Payment
-                </th>
-
-                <th className="px-5 py-4 text-center text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Status
-                </th>
-
-                <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Created
-                </th>
-
-                <th className="px-5 py-4 text-right text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Action
-                </th>
+              <tr style={{ borderBottom: `1px solid ${THEME.border}`, textAlign: "left", color: THEME.muted, background: "rgba(255,255,255,0.02)" }}>
+                <th style={{ padding: "16px 20px", fontWeight: 600 }}>Invoice</th>
+                <th style={{ padding: "16px 20px", fontWeight: 600 }}>Buyer</th>
+                <th style={{ padding: "16px 20px", fontWeight: 600 }}>Concert</th>
+                <th style={{ padding: "16px 20px", fontWeight: 600, textAlign: "right" }}>Amount</th>
+                <th style={{ padding: "16px 20px", fontWeight: 600, textAlign: "center" }}>Status</th>
+                <th style={{ padding: "16px 20px", fontWeight: 600, textAlign: "right" }}>Action</th>
               </tr>
             </thead>
-
             <tbody>
-              {filteredTransactions.length > 0 ? (
-                filteredTransactions.map((transaction) => (
-                  <tr
-                    key={transaction.id}
-                    className="border-b border-white/5 transition hover:bg-white/[0.02]"
-                  >
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-purple-500/10 text-purple-400">
-                          <Receipt size={16} />
-                        </div>
-
-                        <div>
-                          <p className="text-xs font-semibold text-white">
-                            {transaction.id}
-                          </p>
-
-                          <p className="mt-1 text-[10px] text-slate-600">
-                            Order
-                          </p>
-                        </div>
+              {filtered.map(t => (
+                <tr key={t.key} style={{ borderBottom: `1px solid ${THEME.border}` }}>
+                  <td style={{ padding: "16px 20px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(236,72,153,0.1)", display: "flex", alignItems: "center", justifyContent: "center", color: THEME.pink }}>
+                        <Receipt size={16} />
                       </div>
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <p className="text-xs font-medium text-slate-300">
-                        {transaction.buyer}
-                      </p>
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <p className="max-w-[200px] truncate text-xs text-slate-400">
-                        {transaction.event}
-                      </p>
-                    </td>
-
-                    <td className="px-5 py-4 text-right">
-                      <p className="text-xs font-semibold text-white">
-                        {formatCurrency(transaction.amount)}
-                      </p>
-                    </td>
-
-                    <td className="px-5 py-4 text-center">
-                      <span className="inline-flex items-center gap-1.5 text-xs text-slate-400">
-                        <CreditCard
-                          size={13}
-                          className="text-slate-600"
-                        />
-                        {transaction.paymentMethod}
-                      </span>
-                    </td>
-
-                    <td className="px-5 py-4 text-center">
-                      <StatusBadge status={transaction.status} />
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <p className="text-xs text-slate-500">
-                        {transaction.createdAt}
-                      </p>
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <div className="relative flex justify-end">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setMenuId(
-                              menuId === transaction.id
-                                ? null
-                                : transaction.id
-                            )
-                          }
-                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-slate-400 transition hover:bg-white/5 hover:text-white"
-                        >
-                          <MoreHorizontal size={17} />
-                        </button>
-
-                        {menuId === transaction.id && (
-                          <>
-                            <button
-                              type="button"
-                              aria-label="Close menu"
-                              onClick={() => setMenuId(null)}
-                              className="fixed inset-0 z-10 cursor-default"
-                            />
-
-                            <div className="absolute right-0 top-11 z-20 w-52 rounded-xl border border-white/10 bg-[#151c2c] p-1.5 shadow-2xl">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedTransaction(transaction);
-                                  setMenuId(null);
-                                }}
-                                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-slate-300 transition hover:bg-white/5 hover:text-white"
-                              >
-                                <Eye size={15} />
-                                Lihat Detail
-                              </button>
-
-                              {transaction.status === "paid" && (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleRefund(transaction.id)
-                                    }
-                                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-blue-400 transition hover:bg-blue-500/10"
-                                  >
-                                    <RefreshCcw size={15} />
-                                    Refund Transaction
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleCancel(transaction.id)
-                                    }
-                                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-rose-400 transition hover:bg-rose-500/10"
-                                  >
-                                    <XCircle size={15} />
-                                    Cancel Order
-                                  </button>
-                                </>
-                              )}
-
-                              {transaction.status === "pending" && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleCancel(transaction.id)
-                                  }
-                                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-rose-400 transition hover:bg-rose-500/10"
-                                >
-                                  <XCircle size={15} />
-                                  Cancel Order
-                                </button>
-                              )}
-                            </div>
-                          </>
-                        )}
+                      <div>
+                        <p style={{ margin: 0, fontWeight: 600, color: THEME.text }}>{t.id}</p>
+                        <p style={{ margin: 0, fontSize: "0.75rem", color: THEME.muted }}>{t.createdAt}</p>
                       </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="8" className="px-5 py-16 text-center">
-                    <div className="flex flex-col items-center">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/5 text-slate-600">
-                        <Receipt size={20} />
-                      </div>
-
-                      <p className="mt-3 text-sm font-medium text-slate-400">
-                        Transaksi tidak ditemukan
-                      </p>
-
-                      <p className="mt-1 text-xs text-slate-600">
-                        Coba gunakan kata kunci atau filter yang berbeda.
-                      </p>
+                    </div>
+                  </td>
+                  <td style={{ padding: "16px 20px", color: THEME.text }}>{t.buyer}</td>
+                  <td style={{ padding: "16px 20px", color: THEME.muted, maxWidth: 200, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.event}</td>
+                  <td style={{ padding: "16px 20px", textAlign: "right", fontWeight: 600, color: THEME.text }}>{formatCurrency(t.amount)}</td>
+                  <td style={{ padding: "16px 20px", textAlign: "center" }}><StatusBadge status={t.status} /></td>
+                  <td style={{ padding: "16px 20px", textAlign: "right" }}>
+                    <div style={{ position: "relative", display: "inline-block" }}>
+                      <button onClick={() => setMenuId(menuId === t.key ? null : t.key)} style={{ background: "none", border: `1px solid ${THEME.border}`, borderRadius: 8, padding: "6px 8px", color: THEME.muted, cursor: "pointer" }}>
+                        <MoreHorizontal size={16} />
+                      </button>
+                      {menuId === t.key && (
+                        <>
+                          <div style={{ position: "fixed", inset: 0, zIndex: 10 }} onClick={() => setMenuId(null)} />
+                          <div style={{ position: "absolute", right: 0, top: 36, background: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 12, padding: 6, zIndex: 20, minWidth: 160, boxShadow: "0 10px 25px rgba(0,0,0,0.5)", textAlign: "left" }}>
+                            <button onClick={() => { setSelected(t); setMenuId(null); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "10px 12px", background: "none", border: "none", color: THEME.text, fontSize: "0.85rem", cursor: "pointer" }}><Eye size={14} /> Lihat Detail</button>
+                            {t.status === "paid" && (
+                              <button onClick={() => handleStatus(t, "refunded")} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "10px 12px", background: "none", border: "none", color: THEME.purple, fontSize: "0.85rem", cursor: "pointer" }}><RefreshCcw size={14} /> Refund</button>
+                            )}
+                            {["paid", "pending"].includes(t.status) && (
+                              <button onClick={() => handleStatus(t, "cancelled")} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "10px 12px", background: "none", border: "none", color: THEME.danger, fontSize: "0.85rem", cursor: "pointer" }}><XCircle size={14} /> Cancel</button>
+                            )}
+                          </div>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
-              )}
+              ))}
             </tbody>
           </table>
         </div>
       </div>
 
-      {selectedTransaction && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-white/10 bg-[#101827] shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-              <div>
-                <h2 className="text-base font-semibold text-white">
-                  Detail Transaction
-                </h2>
-
-                <p className="mt-1 text-xs text-slate-500">
-                  Informasi pembayaran dan order tiket
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setSelectedTransaction(null)}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/5 hover:text-white"
-              >
-                <X size={18} />
-              </button>
+      {selected && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ background: THEME.surface, borderRadius: 20, border: `1px solid ${THEME.border}`, maxWidth: 500, width: "100%", padding: 24 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 800 }}>Detail Transaksi</h3>
+              <button onClick={() => setSelected(null)} style={{ background: "none", border: "none", color: THEME.muted, cursor: "pointer" }}><X size={20} /></button>
             </div>
-
-            <div className="p-5">
-              <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-500/10 text-purple-400">
-                      <Receipt size={19} />
-                    </div>
-
-                    <div>
-                      <p className="text-sm font-semibold text-white">
-                        {selectedTransaction.id}
-                      </p>
-
-                      <p className="mt-1 text-[11px] text-slate-600">
-                        {selectedTransaction.createdAt}
-                      </p>
-                    </div>
-                  </div>
-
-                  <StatusBadge
-                    status={selectedTransaction.status}
-                  />
-                </div>
+            <div style={{ background: THEME.bg, padding: 16, borderRadius: 12, marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <p style={{ margin: 0, fontWeight: 700, fontSize: "1.1rem" }}>{selected.id}</p>
+                <p style={{ margin: "4px 0 0", fontSize: "0.8rem", color: THEME.muted }}>{selected.createdAt}</p>
               </div>
-
-              <div className="mt-4 space-y-3">
-                <div className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3">
-                  <span className="text-xs text-slate-500">
-                    Buyer
-                  </span>
-
-                  <span className="text-xs font-semibold text-white">
-                    {selectedTransaction.buyer}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between gap-4 rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3">
-                  <span className="shrink-0 text-xs text-slate-500">
-                    Concert
-                  </span>
-
-                  <span className="text-right text-xs font-semibold text-white">
-                    {selectedTransaction.event}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3">
-                  <span className="text-xs text-slate-500">
-                    Payment Method
-                  </span>
-
-                  <span className="flex items-center gap-2 text-xs font-semibold text-white">
-                    <CreditCard size={14} className="text-cyan-400" />
-                    {selectedTransaction.paymentMethod}
-                  </span>
-                </div>
-
-                <div className="rounded-xl border border-purple-500/10 bg-purple-500/5 px-4 py-4">
-                  <p className="text-xs text-slate-500">
-                    Transaction Amount
-                  </p>
-
-                  <p className="mt-2 text-xl font-bold text-purple-400">
-                    {formatCurrency(selectedTransaction.amount)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-5 flex gap-2">
-                {selectedTransaction.status === "paid" && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        refundTransaction(selectedTransaction.id);
-                        setSelectedTransaction({
-                          ...selectedTransaction,
-                          status: "refunded",
-                        });
-                      }}
-                      className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-blue-500/10 px-4 py-3 text-xs font-bold text-blue-400 transition hover:bg-blue-500/20"
-                    >
-                      <RefreshCcw size={15} />
-                      Refund
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        cancelTransaction(selectedTransaction.id);
-                        setSelectedTransaction({
-                          ...selectedTransaction,
-                          status: "cancelled",
-                        });
-                      }}
-                      className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-rose-500/10 px-4 py-3 text-xs font-bold text-rose-400 transition hover:bg-rose-500/20"
-                    >
-                      <XCircle size={15} />
-                      Cancel
-                    </button>
-                  </>
-                )}
-
-                {selectedTransaction.status === "pending" && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      cancelTransaction(selectedTransaction.id);
-                      setSelectedTransaction({
-                        ...selectedTransaction,
-                        status: "cancelled",
-                      });
-                    }}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-rose-500/10 px-4 py-3 text-xs font-bold text-rose-400 transition hover:bg-rose-500/20"
-                  >
-                    <XCircle size={15} />
-                    Cancel Order
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedTransaction(null)}
-                  className="rounded-xl border border-white/10 px-5 py-3 text-xs font-semibold text-slate-400 transition hover:bg-white/5 hover:text-white"
-                >
-                  Tutup
-                </button>
-              </div>
+              <StatusBadge status={selected.status} />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9rem" }}><span style={{ color: THEME.muted }}>Buyer</span><span style={{ color: THEME.text, fontWeight: 600 }}>{selected.buyer}</span></div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9rem" }}><span style={{ color: THEME.muted }}>Concert</span><span style={{ color: THEME.text, fontWeight: 600, textAlign: "right" }}>{selected.event}</span></div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9rem" }}><span style={{ color: THEME.muted }}>Metode</span><span style={{ color: THEME.text, fontWeight: 600 }}>{selected.paymentMethod}</span></div>
+              <div style={{ height: 1, background: THEME.border, margin: "4px 0" }} />
+              <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ color: THEME.muted }}>Total</span><span style={{ color: THEME.success, fontWeight: 800, fontSize: "1.2rem" }}>{formatCurrency(selected.amount)}</span></div>
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              {selected.status === "paid" && (
+                <button onClick={() => handleStatus(selected, "refunded")} style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", background: "rgba(168,85,247,0.1)", color: THEME.purple, fontWeight: 700, cursor: "pointer" }}>Refund</button>
+              )}
+              {["paid", "pending"].includes(selected.status) && (
+                <button onClick={() => handleStatus(selected, "cancelled")} style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", background: "rgba(239,68,68,0.1)", color: THEME.danger, fontWeight: 700, cursor: "pointer" }}>Cancel</button>
+              )}
+              <button onClick={() => setSelected(null)} style={{ padding: "12px 20px", borderRadius: 10, border: `1px solid ${THEME.border}`, background: "transparent", color: THEME.muted, fontWeight: 600, cursor: "pointer" }}>Tutup</button>
             </div>
           </div>
         </div>

@@ -2,10 +2,14 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Bell, Heart, Menu } from 'lucide-react';
 import { useTransaction } from '../user/context/TransactionContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function Header({ setIsSidebarOpen }) {
   const navigate = useNavigate();
   const { unreadCount } = useTransaction();
+  const { user } = useAuth();
+
+  const avatarName = user?.name || "User";
 
   return (
     <>
@@ -38,12 +42,12 @@ export default function Header({ setIsSidebarOpen }) {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
           {/* Mobile Menu Button (Hamburger) */}
-          <button 
-            onClick={() => setIsSidebarOpen(true)} 
-            className="mobile-menu-btn" 
-            style={{ 
-              background: '#1a1d2e', border: '1px solid #282c42', 
-              color: '#fff', cursor: 'pointer', padding: '8px', borderRadius: '10px' 
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            className="mobile-menu-btn"
+            style={{
+              background: '#1a1d2e', border: '1px solid #282c42',
+              color: '#fff', cursor: 'pointer', padding: '8px', borderRadius: '10px'
             }}
             aria-label="Open Menu"
           >
@@ -66,12 +70,12 @@ export default function Header({ setIsSidebarOpen }) {
 
         {/* Right Controls & Profile */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          
+
           {/* Tombol Notifikasi */}
-          <button 
+          <button
             onClick={() => navigate('/notifications')}
-            style={{ 
-              position: 'relative', background: '#1a1d2e', border: '1px solid #282c42', 
+            style={{
+              position: 'relative', background: '#1a1d2e', border: '1px solid #282c42',
               color: '#9ca3af', cursor: 'pointer', padding: '8px', borderRadius: '50%',
               display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}
@@ -79,9 +83,9 @@ export default function Header({ setIsSidebarOpen }) {
           >
             <Bell size={18} />
             {unreadCount > 0 && (
-              <span style={{ 
-                position: 'absolute', top: '-4px', right: '-4px', 
-                minWidth: '16px', height: '16px', backgroundColor: '#ec4899', 
+              <span style={{
+                position: 'absolute', top: '-4px', right: '-4px',
+                minWidth: '16px', height: '16px', backgroundColor: '#ec4899',
                 borderRadius: '50%', color: '#fff', fontSize: '10px', fontWeight: '800',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px'
               }}>
@@ -91,10 +95,10 @@ export default function Header({ setIsSidebarOpen }) {
           </button>
 
           {/* Tombol Favorit */}
-          <button 
+          <button
             onClick={() => navigate('/favorites')}
-            style={{ 
-              background: '#1a1d2e', border: '1px solid #282c42', 
+            style={{
+              background: '#1a1d2e', border: '1px solid #282c42',
               color: '#9ca3af', cursor: 'pointer', padding: '8px', borderRadius: '50%',
               display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}
@@ -104,14 +108,14 @@ export default function Header({ setIsSidebarOpen }) {
           </button>
 
           {/* Foto Profile */}
-          <div 
+          <div
             onClick={() => navigate('/profile')}
-            style={{ 
-              width: '36px', 
-              height: '36px', 
-              borderRadius: '50%', 
-              overflow: 'hidden', 
-              border: '2px solid #38bdf8', 
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
+              overflow: 'hidden',
+              border: '2px solid #38bdf8',
               cursor: 'pointer',
               backgroundColor: '#1e2235',
               display: 'flex',
@@ -121,10 +125,16 @@ export default function Header({ setIsSidebarOpen }) {
             }}
             title="Profile Saya"
           >
-            <img 
-              src="https://ui-avatars.com/api/?name=User+Profile&background=38bdf8&color=fff&bold=true" 
-              alt="Profile" 
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+            <img
+              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
+                avatarName
+              )}&background=38bdf8&color=fff&bold=true`}
+              alt={avatarName}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+              }}
             />
           </div>
         </div>

@@ -8,9 +8,15 @@ export function FavoriteProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   const loadFavorites = useCallback(async () => {
+    const token = localStorage.getItem('auralis_token');
+    if (!token) {
+      setLoading(false);
+      return;
+    }
     try {
-      const data = await api.getFavorites();
-      setFavorites(data);
+      const res = await api.getMyFavorites();
+      const raw = res.data ?? res;
+      setFavorites(Array.isArray(raw) ? raw : []);
     } catch (error) {
       console.error('Gagal memuat favorit', error);
     } finally {
@@ -23,13 +29,22 @@ export function FavoriteProvider({ children }) {
   }, [loadFavorites]);
 
   const toggleFavorite = async (event) => {
-    const updated = await api.toggleFavorite(event);
-    setFavorites(updated);
+    const eventId = typeof event === 'number' ? event : event.id;
+    try {
+      await api.toggleFavorite(eventId);
+      await loadFavorites();
+    } catch (error) {
+      console.error('Gagal toggle favorit', error);
+    }
   };
 
-  const isFavorite = (eventId) => favorites.some((f) => f.id === eventId);
+  const isFavorite = (eventId) =>
+    favorites.some((f) => {
+      const fid = f.event_id ?? f.event?.id ?? f.id;
+      return fid === eventId;
+    });
 
-  const value = { favorites, loading, toggleFavorite, isFavorite };
+  const value = { favorites, loading, toggleFavorite, isFavorite, loadFavorites };
 
   return <FavoriteContext.Provider value={value}>{children}</FavoriteContext.Provider>;
 }

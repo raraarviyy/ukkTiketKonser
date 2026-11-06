@@ -13,57 +13,38 @@ import {
   XCircle,
 } from "lucide-react";
 import { useAdmin } from "../context/AdminContext";
+import { THEME } from "../../theme";
 
 const formatCurrency = (value) =>
-  new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(value);
+  new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(value || 0);
 
-const formatNumber = (value) =>
-  new Intl.NumberFormat("id-ID").format(value);
+const formatNumber = (value) => new Intl.NumberFormat("id-ID").format(value || 0);
 
 const statusConfig = {
-  active: {
-    label: "Active",
-    className: "border-emerald-500/20 bg-emerald-500/10 text-emerald-400",
-  },
-  pending: {
-    label: "Pending",
-    className: "border-yellow-500/20 bg-yellow-500/10 text-yellow-400",
-  },
-  suspended: {
-    label: "Suspended",
-    className: "border-rose-500/20 bg-rose-500/10 text-rose-400",
-  },
+  active: { label: "Active", color: THEME.success, bg: "rgba(16,185,129,0.1)" },
+  pending: { label: "Pending", color: THEME.warning, bg: "rgba(245,158,11,0.1)" },
+  suspended: { label: "Suspended", color: THEME.danger, bg: "rgba(239,68,68,0.1)" },
 };
 
 function StatusBadge({ status }) {
   const config = statusConfig[status] || statusConfig.pending;
-
   return (
-    <span
-      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold ${config.className}`}
-    >
+    <span style={{ padding: "4px 10px", borderRadius: 20, fontSize: "0.7rem", fontWeight: 700, backgroundColor: config.bg, color: config.color, display: "inline-block" }}>
       {config.label}
     </span>
   );
 }
 
-function StatBox({ title, value, icon: Icon, iconClass }) {
+function StatCard({ title, value, icon: Icon, color }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-[#0d1422] p-5">
-      <div className="flex items-center justify-between">
+    <div style={{ backgroundColor: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 16, padding: 20 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <p className="text-xs font-medium text-slate-500">{title}</p>
-          <p className="mt-2 text-2xl font-bold text-white">{value}</p>
+          <p style={{ margin: 0, fontSize: "0.8rem", color: THEME.muted, fontWeight: 500 }}>{title}</p>
+          <h3 style={{ margin: "6px 0 0", fontSize: "clamp(1.2rem, 4vw, 1.5rem)", fontWeight: 800, color: THEME.text }}>{value}</h3>
         </div>
-
-        <div
-          className={`flex h-11 w-11 items-center justify-center rounded-xl ${iconClass}`}
-        >
-          <Icon size={20} />
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: `${color}15`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <Icon size={20} color={color} />
         </div>
       </div>
     </div>
@@ -71,494 +52,158 @@ function StatBox({ title, value, icon: Icon, iconClass }) {
 }
 
 export default function AdminOrganizers() {
-  const {
-    organizers,
-    approveOrganizer,
-    suspendOrganizer,
-    activateOrganizer,
-  } = useAdmin();
-
+  const { organizers, approveOrganizer, suspendOrganizer, activateOrganizer } = useAdmin();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [selectedOrganizer, setSelectedOrganizer] = useState(null);
+  const [selected, setSelected] = useState(null);
   const [menuId, setMenuId] = useState(null);
 
-  const filteredOrganizers = useMemo(() => {
-    return organizers.filter((organizer) => {
-      const keyword = search.toLowerCase();
-
-      const matchesSearch =
-        organizer.name.toLowerCase().includes(keyword) ||
-        organizer.email.toLowerCase().includes(keyword);
-
-      const matchesStatus =
-        statusFilter === "all" || organizer.status === statusFilter;
-
-      return matchesSearch && matchesStatus;
+  const filtered = useMemo(() => {
+    return organizers.filter((org) => {
+      const kw = search.toLowerCase();
+      const matchSearch = (org.name || "").toLowerCase().includes(kw) || (org.email || "").toLowerCase().includes(kw);
+      const matchStatus = statusFilter === "all" || org.status === statusFilter;
+      return matchSearch && matchStatus;
     });
   }, [organizers, search, statusFilter]);
 
-  const activeCount = organizers.filter(
-    (organizer) => organizer.status === "active"
-  ).length;
+  const activeCount = organizers.filter(o => o.status === "active").length;
+  const pendingCount = organizers.filter(o => o.status === "pending").length;
+  const suspendedCount = organizers.filter(o => o.status === "suspended").length;
+  const totalRevenue = organizers.reduce((sum, o) => sum + (o.revenue || 0), 0);
 
-  const pendingCount = organizers.filter(
-    (organizer) => organizer.status === "pending"
-  ).length;
-
-  const suspendedCount = organizers.filter(
-    (organizer) => organizer.status === "suspended"
-  ).length;
-
-  const totalRevenue = organizers.reduce(
-    (total, organizer) => total + organizer.revenue,
-    0
-  );
-
-  const handleAction = (action, id) => {
-    if (action === "approve") {
-      approveOrganizer(id);
-    }
-
-    if (action === "suspend") {
-      suspendOrganizer(id);
-    }
-
-    if (action === "activate") {
-      activateOrganizer(id);
-    }
-
+  const handleAction = async (action, id) => {
+    if (action === "approve") await approveOrganizer(id);
+    if (action === "suspend") await suspendOrganizer(id);
+    if (action === "activate") await activateOrganizer(id);
     setMenuId(null);
   };
 
   return (
-    <div className="mx-auto w-full max-w-[1600px]">
-      <div className="mb-8">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-purple-500/20 bg-purple-500/10 px-3 py-1.5 text-xs font-medium text-purple-300">
-              <Building2 size={13} />
-              Organizer Management
-            </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 1400 }}>
+      <div>
+        <h1 style={{ margin: 0, fontSize: "clamp(1.4rem, 3vw, 1.9rem)", fontWeight: 800, color: THEME.text }}>Organizer Management</h1>
+        <p style={{ margin: "6px 0 0", fontSize: "0.9rem", color: THEME.muted }}>Kelola organizer terdaftar, status akun, dan performa penjualan mereka.</p>
+      </div>
 
-            <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-              Organizer Management
-            </h1>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
+        <StatCard title="Total Organizer" value={formatNumber(organizers.length)} icon={Building2} color={THEME.pink} />
+        <StatCard title="Active" value={formatNumber(activeCount)} icon={ShieldCheck} color={THEME.success} />
+        <StatCard title="Pending" value={formatNumber(pendingCount)} icon={UserRound} color={THEME.warning} />
+        <StatCard title="Total Revenue" value={formatCurrency(totalRevenue)} icon={XCircle} color={THEME.purple} />
+      </div>
 
-            <p className="mt-2 text-sm text-slate-400">
-              Kelola organizer yang terdaftar, approval, status akun, dan
-              performa penjualan mereka.
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-white/10 bg-[#0d1422] px-4 py-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">
-              Total Revenue Organizer
-            </p>
-            <p className="mt-1 text-sm font-bold text-white">
-              {formatCurrency(totalRevenue)}
-            </p>
-          </div>
+      <div style={{ backgroundColor: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 18, padding: 20, display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", background: THEME.bg, border: `1px solid ${THEME.border}`, borderRadius: 12, padding: "0 14px", flex: "1 1 300px" }}>
+          <Search size={18} color={THEME.dim} />
+          <input type="text" placeholder="Cari organizer atau email..." value={search} onChange={e => setSearch(e.target.value)} style={{ width: "100%", background: "none", border: "none", padding: "12px", color: THEME.text, outline: "none", fontSize: "0.9rem" }} />
+        </div>
+        <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+          {["all", "active", "pending", "suspended"].map(s => (
+            <button key={s} onClick={() => setStatusFilter(s)} style={{ padding: "10px 16px", borderRadius: 10, border: "none", background: statusFilter === s ? THEME.gradient : THEME.bg, color: statusFilter === s ? "#fff" : THEME.muted, fontSize: "0.85rem", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+              {s === "all" ? "Semua" : statusConfig[s]?.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatBox
-          title="Total Organizer"
-          value={formatNumber(organizers.length)}
-          icon={Building2}
-          iconClass="bg-purple-500/10 text-purple-400"
-        />
-
-        <StatBox
-          title="Active"
-          value={formatNumber(activeCount)}
-          icon={ShieldCheck}
-          iconClass="bg-emerald-500/10 text-emerald-400"
-        />
-
-        <StatBox
-          title="Pending Approval"
-          value={formatNumber(pendingCount)}
-          icon={UserRound}
-          iconClass="bg-yellow-500/10 text-yellow-400"
-        />
-
-        <StatBox
-          title="Suspended"
-          value={formatNumber(suspendedCount)}
-          icon={XCircle}
-          iconClass="bg-rose-500/10 text-rose-400"
-        />
-      </div>
-
-      <div className="mt-6 rounded-2xl border border-white/10 bg-[#0d1422] p-4 sm:p-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="relative w-full lg:max-w-md">
-            <Search
-              size={17}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600"
-            />
-
-            <input
-              type="text"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Cari organizer atau email..."
-              className="h-11 w-full rounded-xl border border-white/10 bg-[#090f1b] pl-10 pr-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-purple-500/40"
-            />
-          </div>
-
-          <div className="flex gap-2 overflow-x-auto">
-            {[
-              { value: "all", label: "Semua" },
-              { value: "active", label: "Active" },
-              { value: "pending", label: "Pending" },
-              { value: "suspended", label: "Suspended" },
-            ].map((filter) => (
-              <button
-                key={filter.value}
-                type="button"
-                onClick={() => setStatusFilter(filter.value)}
-                className={`whitespace-nowrap rounded-lg px-4 py-2.5 text-xs font-semibold transition ${
-                  statusFilter === filter.value
-                    ? "bg-purple-500 text-white"
-                    : "border border-white/10 bg-white/[0.02] text-slate-400 hover:bg-white/5 hover:text-white"
-                }`}
-              >
-                {filter.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-[#0d1422]">
-        <div className="border-b border-white/10 px-5 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-semibold text-white">
-                Daftar Organizer
-              </h2>
-              <p className="mt-1 text-xs text-slate-500">
-                {filteredOrganizers.length} organizer ditemukan
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px]">
+      <div style={{ backgroundColor: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 18, overflow: "hidden" }}>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", minWidth: 800, borderCollapse: "collapse", fontSize: "0.85rem" }}>
             <thead>
-              <tr className="border-b border-white/5 bg-white/[0.015] text-left">
-                <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Organizer
-                </th>
-                <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Status
-                </th>
-                <th className="px-5 py-4 text-center text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Concert
-                </th>
-                <th className="px-5 py-4 text-center text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Ticket Sold
-                </th>
-                <th className="px-5 py-4 text-right text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Revenue
-                </th>
-                <th className="px-5 py-4 text-right text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Action
-                </th>
+              <tr style={{ borderBottom: `1px solid ${THEME.border}`, textAlign: "left", color: THEME.muted, background: "rgba(255,255,255,0.02)" }}>
+                <th style={{ padding: "16px 20px", fontWeight: 600 }}>Organizer</th>
+                <th style={{ padding: "16px 20px", fontWeight: 600 }}>Status</th>
+                <th style={{ padding: "16px 20px", fontWeight: 600, textAlign: "center" }}>Events</th>
+                <th style={{ padding: "16px 20px", fontWeight: 600, textAlign: "right" }}>Revenue</th>
+                <th style={{ padding: "16px 20px", fontWeight: 600, textAlign: "right" }}>Action</th>
               </tr>
             </thead>
-
             <tbody>
-              {filteredOrganizers.length > 0 ? (
-                filteredOrganizers.map((organizer) => (
-                  <tr
-                    key={organizer.id}
-                    className="border-b border-white/5 transition hover:bg-white/[0.02]"
-                  >
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 text-purple-400">
-                          <Building2 size={18} />
-                        </div>
-
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-white">
-                            {organizer.name}
-                          </p>
-
-                          <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                            <Mail size={12} />
-                            <span>{organizer.email}</span>
+              {filtered.map(org => (
+                <tr key={org.id} style={{ borderBottom: `1px solid ${THEME.border}` }}>
+                  <td style={{ padding: "16px 20px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{ width: 40, height: 40, borderRadius: 12, background: "rgba(236,72,153,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: THEME.pink }}>
+                        <Building2 size={18} />
+                      </div>
+                      <div>
+                        <p style={{ margin: 0, fontWeight: 600, color: THEME.text }}>{org.name}</p>
+                        <p style={{ margin: 0, fontSize: "0.75rem", color: THEME.muted }}>{org.email}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{ padding: "16px 20px" }}><StatusBadge status={org.status} /></td>
+                  <td style={{ padding: "16px 20px", textAlign: "center", color: THEME.text, fontWeight: 600 }}>{org.concerts || 0}</td>
+                  <td style={{ padding: "16px 20px", textAlign: "right", color: THEME.text, fontWeight: 600 }}>{formatCurrency(org.revenue)}</td>
+                  <td style={{ padding: "16px 20px", textAlign: "right" }}>
+                    <div style={{ position: "relative", display: "inline-block" }}>
+                      <button onClick={() => setMenuId(menuId === org.id ? null : org.id)} style={{ background: "none", border: `1px solid ${THEME.border}`, borderRadius: 8, padding: "6px 8px", color: THEME.muted, cursor: "pointer" }}>
+                        <MoreHorizontal size={16} />
+                      </button>
+                      {menuId === org.id && (
+                        <>
+                          <div style={{ position: "fixed", inset: 0, zIndex: 10 }} onClick={() => setMenuId(null)} />
+                          <div style={{ position: "absolute", right: 0, top: 36, background: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 12, padding: 6, zIndex: 20, minWidth: 160, boxShadow: "0 10px 25px rgba(0,0,0,0.5)", textAlign: "left" }}>
+                            <button onClick={() => { setSelected(org); setMenuId(null); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "10px 12px", background: "none", border: "none", color: THEME.text, fontSize: "0.85rem", cursor: "pointer" }}><Eye size={14} /> Detail</button>
+                            {org.status === "pending" && (
+                              <button onClick={() => handleAction("approve", org.id)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "10px 12px", background: "none", border: "none", color: THEME.success, fontSize: "0.85rem", cursor: "pointer" }}><Check size={14} /> Approve</button>
+                            )}
+                            {org.status === "active" && (
+                              <button onClick={() => handleAction("suspend", org.id)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "10px 12px", background: "none", border: "none", color: THEME.danger, fontSize: "0.85rem", cursor: "pointer" }}><X size={14} /> Suspend</button>
+                            )}
+                            {org.status === "suspended" && (
+                              <button onClick={() => handleAction("activate", org.id)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "10px 12px", background: "none", border: "none", color: THEME.success, fontSize: "0.85rem", cursor: "pointer" }}><ShieldCheck size={14} /> Aktifkan</button>
+                            )}
                           </div>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <StatusBadge status={organizer.status} />
-                    </td>
-
-                    <td className="px-5 py-4 text-center">
-                      <span className="text-sm font-semibold text-slate-300">
-                        {formatNumber(organizer.concerts)}
-                      </span>
-                    </td>
-
-                    <td className="px-5 py-4 text-center">
-                      <span className="text-sm font-semibold text-slate-300">
-                        {formatNumber(organizer.ticketsSold)}
-                      </span>
-                    </td>
-
-                    <td className="px-5 py-4 text-right">
-                      <span className="text-sm font-semibold text-white">
-                        {formatCurrency(organizer.revenue)}
-                      </span>
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <div className="relative flex justify-end">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setMenuId(
-                              menuId === organizer.id ? null : organizer.id
-                            )
-                          }
-                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-slate-400 transition hover:bg-white/5 hover:text-white"
-                        >
-                          <MoreHorizontal size={17} />
-                        </button>
-
-                        {menuId === organizer.id && (
-                          <>
-                            <button
-                              type="button"
-                              aria-label="Close menu"
-                              onClick={() => setMenuId(null)}
-                              className="fixed inset-0 z-10 cursor-default"
-                            />
-
-                            <div className="absolute right-0 top-11 z-20 w-48 rounded-xl border border-white/10 bg-[#151c2c] p-1.5 shadow-2xl">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedOrganizer(organizer);
-                                  setMenuId(null);
-                                }}
-                                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-slate-300 transition hover:bg-white/5 hover:text-white"
-                              >
-                                <Eye size={15} />
-                                Lihat Detail
-                              </button>
-
-                              {organizer.status === "pending" && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleAction("approve", organizer.id)
-                                  }
-                                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-emerald-400 transition hover:bg-emerald-500/10"
-                                >
-                                  <Check size={15} />
-                                  Approve Organizer
-                                </button>
-                              )}
-
-                              {organizer.status === "active" && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleAction("suspend", organizer.id)
-                                  }
-                                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-rose-400 transition hover:bg-rose-500/10"
-                                >
-                                  <X size={15} />
-                                  Suspend Organizer
-                                </button>
-                              )}
-
-                              {organizer.status === "suspended" && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleAction("activate", organizer.id)
-                                  }
-                                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-emerald-400 transition hover:bg-emerald-500/10"
-                                >
-                                  <ShieldCheck size={15} />
-                                  Activate Organizer
-                                </button>
-                              )}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="6" className="px-5 py-16 text-center">
-                    <div className="flex flex-col items-center">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/5 text-slate-600">
-                        <Search size={20} />
-                      </div>
-
-                      <p className="mt-3 text-sm font-medium text-slate-400">
-                        Organizer tidak ditemukan
-                      </p>
-
-                      <p className="mt-1 text-xs text-slate-600">
-                        Coba gunakan kata kunci atau filter yang berbeda.
-                      </p>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
-              )}
+              ))}
             </tbody>
           </table>
         </div>
       </div>
-
-      {selectedOrganizer && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-white/10 bg-[#101827] shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-              <div>
-                <h2 className="text-base font-semibold text-white">
-                  Detail Organizer
-                </h2>
-                <p className="mt-1 text-xs text-slate-500">
-                  Informasi dan performa organizer
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setSelectedOrganizer(null)}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/5 hover:text-white"
-              >
-                <X size={18} />
-              </button>
+      
+      {/* Modal Detail Organizer */}
+      {selected && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ background: THEME.surface, borderRadius: 20, border: `1px solid ${THEME.border}`, maxWidth: 500, width: "100%", padding: 24 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 800 }}>Detail Organizer</h3>
+              <button onClick={() => setSelected(null)} style={{ background: "none", border: "none", color: THEME.muted, cursor: "pointer" }}><X size={20} /></button>
             </div>
-
-            <div className="p-5">
-              <div className="flex items-center gap-4 rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-500/10 text-purple-400">
-                  <Building2 size={21} />
-                </div>
-
-                <div className="min-w-0">
-                  <h3 className="truncate text-sm font-semibold text-white">
-                    {selectedOrganizer.name}
-                  </h3>
-
-                  <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                    <Mail size={12} />
-                    {selectedOrganizer.email}
-                  </p>
-                </div>
-
-                <div className="ml-auto">
-                  <StatusBadge status={selectedOrganizer.status} />
-                </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 16, padding: 16, background: THEME.bg, borderRadius: 12, marginBottom: 16 }}>
+              <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(236,72,153,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, fontWeight: 800, color: THEME.pink }}>
+                {selected.name?.charAt(0).toUpperCase()}
               </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                  <div className="flex items-center gap-2 text-slate-500">
-                    <CalendarDaysIcon />
-                    <span className="text-xs">Concert</span>
-                  </div>
-
-                  <p className="mt-2 text-lg font-bold text-white">
-                    {formatNumber(selectedOrganizer.concerts)}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                  <div className="flex items-center gap-2 text-slate-500">
-                    <Users size={14} />
-                    <span className="text-xs">Ticket Sold</span>
-                  </div>
-
-                  <p className="mt-2 text-lg font-bold text-white">
-                    {formatNumber(selectedOrganizer.ticketsSold)}
-                  </p>
-                </div>
-
-                <div className="col-span-2 rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                  <p className="text-xs text-slate-500">Total Revenue</p>
-                  <p className="mt-2 text-xl font-bold text-purple-400">
-                    {formatCurrency(selectedOrganizer.revenue)}
-                  </p>
-                </div>
+              <div>
+                <h4 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700 }}>{selected.name}</h4>
+                <p style={{ margin: "4px 0 0", fontSize: "0.85rem", color: THEME.muted }}>{selected.email}</p>
+                <div style={{ marginTop: 8 }}><StatusBadge status={selected.status} /></div>
               </div>
-
-              <div className="mt-5 flex gap-2">
-                {selectedOrganizer.status === "pending" && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      approveOrganizer(selectedOrganizer.id);
-                      setSelectedOrganizer(null);
-                    }}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-xs font-bold text-white transition hover:bg-emerald-400"
-                  >
-                    <Check size={15} />
-                    Approve
-                  </button>
-                )}
-
-                {selectedOrganizer.status === "active" && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      suspendOrganizer(selectedOrganizer.id);
-                      setSelectedOrganizer(null);
-                    }}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-rose-500/10 px-4 py-3 text-xs font-bold text-rose-400 transition hover:bg-rose-500/20"
-                  >
-                    <X size={15} />
-                    Suspend
-                  </button>
-                )}
-
-                {selectedOrganizer.status === "suspended" && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      activateOrganizer(selectedOrganizer.id);
-                      setSelectedOrganizer(null);
-                    }}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-xs font-bold text-emerald-400 transition hover:bg-emerald-500/20"
-                  >
-                    <ShieldCheck size={15} />
-                    Activate
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedOrganizer(null)}
-                  className="rounded-xl border border-white/10 px-5 py-3 text-xs font-semibold text-slate-400 transition hover:bg-white/5 hover:text-white"
-                >
-                  Tutup
-                </button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+              <div style={{ background: THEME.bg, padding: 16, borderRadius: 12, border: `1px solid ${THEME.border}` }}>
+                <p style={{ margin: 0, fontSize: "0.75rem", color: THEME.muted }}>Total Event</p>
+                <p style={{ margin: "4px 0 0", fontSize: "1.2rem", fontWeight: 800 }}>{selected.concerts || 0}</p>
               </div>
+              <div style={{ background: THEME.bg, padding: 16, borderRadius: 12, border: `1px solid ${THEME.border}` }}>
+                <p style={{ margin: 0, fontSize: "0.75rem", color: THEME.muted }}>Total Pendapatan</p>
+                <p style={{ margin: "4px 0 0", fontSize: "1.2rem", fontWeight: 800, color: THEME.success }}>{formatCurrency(selected.revenue)}</p>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              {selected.status === "pending" && <button onClick={() => { approveOrganizer(selected.id); setSelected(null); }} style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", background: THEME.success, color: "#fff", fontWeight: 700, cursor: "pointer" }}>Approve</button>}
+              {selected.status === "active" && <button onClick={() => { suspendOrganizer(selected.id); setSelected(null); }} style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", background: "rgba(239,68,68,0.1)", color: THEME.danger, fontWeight: 700, cursor: "pointer" }}>Suspend</button>}
+              {selected.status === "suspended" && <button onClick={() => { activateOrganizer(selected.id); setSelected(null); }} style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", background: THEME.success, color: "#fff", fontWeight: 700, cursor: "pointer" }}>Aktifkan</button>}
+              <button onClick={() => setSelected(null)} style={{ padding: "12px 20px", borderRadius: 10, border: `1px solid ${THEME.border}`, background: "transparent", color: THEME.muted, fontWeight: 600, cursor: "pointer" }}>Tutup</button>
             </div>
           </div>
         </div>
       )}
     </div>
   );
-}
-
-function CalendarDaysIcon() {
-  return <span className="text-xs">◷</span>;
 }

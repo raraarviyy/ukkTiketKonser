@@ -10,15 +10,20 @@ export function TransactionProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   const loadData = useCallback(async () => {
+    const token = localStorage.getItem('auralis_token');
+    if (!token) {
+      setLoading(false);
+      return;
+    }
     try {
-      const [historyData, ticketsData, notifData] = await Promise.all([
-        api.getHistory(),
+      const [historyRes, ticketsRes, notifRes] = await Promise.all([
+        api.getMyOrders(),
         api.getMyTickets(),
-        api.getNotifications()
+        api.getMyNotifications()
       ]);
-      setHistory(historyData);
-      setMyTickets(ticketsData);
-      setNotifications(notifData);
+      setHistory(historyRes.data || []);
+      setMyTickets(ticketsRes.data || []);
+      setNotifications(notifRes.data || []);
     } catch (error) {
       console.error('Gagal memuat data transaksi', error);
     } finally {

@@ -1,6 +1,5 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
-  ArrowDownToLine,
   Check,
   ChevronDown,
   CircleDollarSign,
@@ -12,114 +11,40 @@ import {
   MoreHorizontal,
   Percent,
   Search,
-  Wallet,
   X,
+  Loader2,
 } from "lucide-react";
 import { useAdmin } from "../context/AdminContext";
+import { THEME } from "../../theme";
 
 const formatCurrency = (value) =>
-  new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(value);
-
-const formatNumber = (value) =>
-  new Intl.NumberFormat("id-ID").format(value);
+  new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(value || 0);
 
 const settlementStatus = {
-  pending: {
-    label: "Pending",
-    className:
-      "border-yellow-500/20 bg-yellow-500/10 text-yellow-400",
-  },
-  processing: {
-    label: "Processing",
-    className:
-      "border-blue-500/20 bg-blue-500/10 text-blue-400",
-  },
-  settled: {
-    label: "Settled",
-    className:
-      "border-emerald-500/20 bg-emerald-500/10 text-emerald-400",
-  },
+  pending: { label: "Pending", color: THEME.warning, bg: "rgba(245,158,11,0.1)" },
+  processing: { label: "Processing", color: THEME.purple, bg: "rgba(168,85,247,0.1)" },
+  settled: { label: "Settled", color: THEME.success, bg: "rgba(16,185,129,0.1)" },
 };
 
-const initialSettlements = [
-  {
-    id: "SET-2026-001",
-    organizer: "Soundwave Organizer",
-    period: "September 2026",
-    gmv: 420000000,
-    platformFee: 21000000,
-    refund: 150000,
-    payout: 398850000,
-    status: "pending",
-    dueDate: "2026-09-30",
-  },
-  {
-    id: "SET-2026-002",
-    organizer: "Nusantara Event",
-    period: "September 2026",
-    gmv: 312000000,
-    platformFee: 15600000,
-    refund: 0,
-    payout: 296400000,
-    status: "processing",
-    dueDate: "2026-09-30",
-  },
-  {
-    id: "SET-2026-003",
-    organizer: "Urban Stage",
-    period: "August 2026",
-    gmv: 86000000,
-    platformFee: 4300000,
-    refund: 1000000,
-    payout: 80700000,
-    status: "settled",
-    dueDate: "2026-09-05",
-  },
-  {
-    id: "SET-2026-004",
-    organizer: "Live Project",
-    period: "August 2026",
-    gmv: 110000000,
-    platformFee: 5500000,
-    refund: 0,
-    payout: 104500000,
-    status: "settled",
-    dueDate: "2026-09-05",
-  },
-];
-
 function StatusBadge({ status }) {
-  const config =
-    settlementStatus[status] || settlementStatus.pending;
-
+  const config = settlementStatus[status] || settlementStatus.pending;
   return (
-    <span
-      className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold ${config.className}`}
-    >
+    <span style={{ padding: "4px 10px", borderRadius: 20, fontSize: "0.7rem", fontWeight: 700, backgroundColor: config.bg, color: config.color, display: "inline-block" }}>
       {config.label}
     </span>
   );
 }
 
-function StatCard({ title, value, icon: Icon, iconClass }) {
+function StatCard({ title, value, icon: Icon, color }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-[#0d1422] p-5">
-      <div className="flex items-center justify-between">
+    <div style={{ backgroundColor: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 16, padding: 20 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <p className="text-xs font-medium text-slate-500">{title}</p>
-          <p className="mt-2 text-2xl font-bold text-white">
-            {value}
-          </p>
+          <p style={{ margin: 0, fontSize: "0.8rem", color: THEME.muted, fontWeight: 500 }}>{title}</p>
+          <h3 style={{ margin: "6px 0 0", fontSize: "clamp(1.2rem, 4vw, 1.5rem)", fontWeight: 800, color: THEME.text }}>{value}</h3>
         </div>
-
-        <div
-          className={`flex h-11 w-11 items-center justify-center rounded-xl ${iconClass}`}
-        >
-          <Icon size={20} />
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: `${color}15`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <Icon size={20} color={color} />
         </div>
       </div>
     </div>
@@ -127,851 +52,249 @@ function StatCard({ title, value, icon: Icon, iconClass }) {
 }
 
 export default function AdminSettlements() {
-  const { platformFee, updatePlatformFee } = useAdmin();
-
-  const [settlements, setSettlements] = useState(
-    initialSettlements
-  );
-
+  const { settlements, platformFee, loading, handleUpdateSettlementStatus, handleUpdatePlatformFee, handleGenerateSettlements } = useAdmin();
+  
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showFilter, setShowFilter] = useState(false);
   const [menuId, setMenuId] = useState(null);
-  const [selectedSettlement, setSelectedSettlement] =
-    useState(null);
-  const [feeInput, setFeeInput] = useState(platformFee);
+  const [selectedId, setSelectedId] = useState(null);
+  const [feeInput, setFeeInput] = useState(String(platformFee));
+  const [savingFee, setSavingFee] = useState(false);
+  const [genYear, setGenYear] = useState(new Date().getFullYear());
+  const [genMonth, setGenMonth] = useState(new Date().getMonth() + 1);
+  const [generating, setGenerating] = useState(false);
 
-  const totals = useMemo(() => {
-    return settlements.reduce(
-      (result, settlement) => {
-        result.gmv += settlement.gmv;
-        result.platformFee += settlement.platformFee;
-        result.refund += settlement.refund;
-        result.payout += settlement.payout;
+  useEffect(() => { setFeeInput(String(platformFee)); }, [platformFee]);
 
-        return result;
-      },
-      {
-        gmv: 0,
-        platformFee: 0,
-        refund: 0,
-        payout: 0,
-      }
-    );
-  }, [settlements]);
+  const selectedSettlement = useMemo(() => settlements.find((s) => s.id === selectedId) || null, [settlements, selectedId]);
 
-  const filteredSettlements = useMemo(() => {
-    return settlements.filter((settlement) => {
-      const keyword = search.toLowerCase();
+  const totals = useMemo(() => settlements.reduce((acc, s) => {
+    acc.gmv += s.gmv; acc.platformFee += s.platform_fee; acc.refund += s.refund; acc.payout += s.payout;
+    return acc;
+  }, { gmv: 0, platformFee: 0, refund: 0, payout: 0 }), [settlements]);
 
-      const matchesSearch =
-        settlement.id.toLowerCase().includes(keyword) ||
-        settlement.organizer.toLowerCase().includes(keyword) ||
-        settlement.period.toLowerCase().includes(keyword);
-
-      const matchesStatus =
-        statusFilter === "all" ||
-        settlement.status === statusFilter;
-
-      return matchesSearch && matchesStatus;
+  const filtered = useMemo(() => {
+    const kw = search.toLowerCase();
+    return settlements.filter((s) => {
+      const matchSearch = (s.settlement_code || "").toLowerCase().includes(kw) || (s.organizer?.organization_name || s.organizer?.name || "").toLowerCase().includes(kw);
+      const matchStatus = statusFilter === "all" || s.status === statusFilter;
+      return matchSearch && matchStatus;
     });
   }, [settlements, search, statusFilter]);
 
-  const pendingAmount = settlements
-    .filter(
-      (settlement) =>
-        settlement.status === "pending" ||
-        settlement.status === "processing"
-    )
-    .reduce((total, settlement) => total + settlement.payout, 0);
+  const pendingAmount = settlements.filter(s => s.status === "pending" || s.status === "processing").reduce((t, s) => t + s.payout, 0);
+  const settledAmount = settlements.filter(s => s.status === "settled").reduce((t, s) => t + s.payout, 0);
 
-  const settledAmount = settlements
-    .filter((settlement) => settlement.status === "settled")
-    .reduce((total, settlement) => total + settlement.payout, 0);
-
-  const handleSaveFee = () => {
-    const value = Number(feeInput);
-
-    if (Number.isNaN(value) || value < 0 || value > 100) {
-      return;
-    }
-
-    updatePlatformFee(value);
-
-    setSettlements((current) =>
-      current.map((settlement) => {
-        const newPlatformFee =
-          Math.round((settlement.gmv * value) / 100);
-
-        return {
-          ...settlement,
-          platformFee: newPlatformFee,
-          payout: Math.max(
-            settlement.gmv -
-              newPlatformFee -
-              settlement.refund,
-            0
-          ),
-        };
-      })
-    );
+  const saveFee = async () => {
+    const v = Number(feeInput);
+    if (Number.isNaN(v) || v < 0 || v > 100) return;
+    setSavingFee(true);
+    try { await handleUpdatePlatformFee(v); } finally { setSavingFee(false); }
   };
 
-  const handleProcessSettlement = (id) => {
-    setSettlements((current) =>
-      current.map((settlement) =>
-        settlement.id === id
-          ? { ...settlement, status: "processing" }
-          : settlement
-      )
-    );
-
-    setMenuId(null);
-
-    if (selectedSettlement?.id === id) {
-      setSelectedSettlement((current) =>
-        current
-          ? { ...current, status: "processing" }
-          : current
-      );
-    }
-  };
-
-  const handleCompleteSettlement = (id) => {
-    setSettlements((current) =>
-      current.map((settlement) =>
-        settlement.id === id
-          ? { ...settlement, status: "settled" }
-          : settlement
-      )
-    );
-
-    setMenuId(null);
-
-    if (selectedSettlement?.id === id) {
-      setSelectedSettlement((current) =>
-        current
-          ? { ...current, status: "settled" }
-          : current
-      );
-    }
+  const generate = async () => {
+    setGenerating(true);
+    try {
+      await handleGenerateSettlements(Number(genYear), Number(genMonth));
+      alert("Settlement berhasil digenerate");
+    } catch (err) {
+      alert(err.message || "Gagal generate");
+    } finally { setGenerating(false); }
   };
 
   const handleExport = () => {
-    const headers = [
-      "Settlement ID",
-      "Organizer",
-      "Period",
-      "GMV",
-      "Platform Fee",
-      "Refund",
-      "Payout",
-      "Status",
-      "Due Date",
-    ];
-
-    const rows = settlements.map((settlement) => [
-      settlement.id,
-      settlement.organizer,
-      settlement.period,
-      settlement.gmv,
-      settlement.platformFee,
-      settlement.refund,
-      settlement.payout,
-      settlement.status,
-      settlement.dueDate,
+    const headers = ["Settlement Code", "Organizer", "Period", "GMV", "Platform Fee", "Refund", "Payout", "Status", "Due Date"];
+    const rows = settlements.map((s) => [
+      s.settlement_code, s.organizer?.organization_name || s.organizer?.name || "-",
+      `${s.period_month}/${s.period_year}`, s.gmv, s.platform_fee, s.refund, s.payout, s.status,
+      s.due_date ? new Date(s.due_date).toISOString().slice(0, 10) : "-",
     ]);
-
-    const csv = [headers, ...rows]
-      .map((row) =>
-        row
-          .map((value) => `"${String(value).replaceAll('"', '""')}"`)
-          .join(",")
-      )
-      .join("\n");
-
-    const blob = new Blob([csv], {
-      type: "text/csv;charset=utf-8;",
-    });
-
+    const csv = [headers, ...rows].map((r) => r.map((c) => `"${String(c).replaceAll('"', '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-
-    link.href = url;
-    link.download = "settlement-report.csv";
-    link.click();
-
+    const a = document.createElement("a"); a.href = url; a.download = "settlement-report.csv"; a.click();
     URL.revokeObjectURL(url);
   };
 
+  if (loading) return <div style={{ display: "flex", height: 300, alignItems: "center", justifyContent: "center" }}><Loader2 size={32} color={THEME.pink} style={{ animation: "spin 1s linear infinite" }} /></div>;
+
   return (
-    <div className="mx-auto w-full max-w-[1600px]">
-      <div className="mb-8">
-        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300">
-          <Wallet size={13} />
-          Commission & Settlement
+    <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 1400 }}>
+      
+      {/* HEADER */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: "clamp(1.4rem, 3vw, 1.9rem)", fontWeight: 800, color: THEME.text }}>Commission & Settlement</h1>
+          <p style={{ margin: "6px 0 0", fontSize: "0.9rem", color: THEME.muted }}>Kelola platform fee, pantau pendapatan, dan proses payout organizer.</p>
+        </div>
+        <button onClick={handleExport} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 12, border: `1px solid ${THEME.border}`, background: THEME.surface, color: THEME.text, fontSize: "0.85rem", fontWeight: 600, cursor: "pointer" }}>
+          <Download size={15} /> Export
+        </button>
+      </div>
+
+      {/* STATS */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
+        <StatCard title="Total GMV" value={formatCurrency(totals.gmv)} icon={CircleDollarSign} color={THEME.pink} />
+        <StatCard title="Platform Rev" value={formatCurrency(totals.platformFee)} icon={Percent} color={THEME.purple} />
+        <StatCard title="Pending Payout" value={formatCurrency(pendingAmount)} icon={Clock3} color={THEME.warning} />
+        <StatCard title="Settled Payout" value={formatCurrency(settledAmount)} icon={Check} color={THEME.success} />
+      </div>
+
+      {/* TOOLS */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
+        <div style={{ background: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 18, padding: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+             <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(236,72,153,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+               <Percent size={18} color={THEME.pink} />
+             </div>
+             <div>
+               <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 700 }}>Platform Fee</h3>
+               <p style={{ margin: 0, fontSize: "0.8rem", color: THEME.muted }}>Biaya layanan dari GMV</p>
+             </div>
+          </div>
+          <div style={{ display: "flex", gap: 12, alignItems: "flex-end" }}>
+            <div style={{ flex: 1 }}>
+               <div style={{ display: "flex", alignItems: "center", background: THEME.bg, border: `1px solid ${THEME.border}`, borderRadius: 12, padding: "0 14px" }}>
+                 <input type="number" min="0" max="100" value={feeInput} onChange={(e) => setFeeInput(e.target.value)} style={{ width: "100%", background: "none", border: "none", padding: "12px 0", color: THEME.text, outline: "none", fontSize: "1rem", fontWeight: 700 }} />
+                 <span style={{ color: THEME.muted, fontWeight: 700 }}>%</span>
+               </div>
+            </div>
+            <button onClick={saveFee} disabled={savingFee} style={{ padding: "12px 20px", borderRadius: 12, border: "none", background: THEME.gradient, color: "#fff", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>{savingFee ? "Menyimpan..." : "Simpan"}</button>
+          </div>
         </div>
 
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-              Commission & Settlement
-            </h1>
-
-            <p className="mt-2 max-w-2xl text-sm text-slate-400">
-              Kelola platform fee, pantau pendapatan platform,
-              dan proses payout organizer.
-            </p>
+        <div style={{ background: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 18, padding: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+             <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(168,85,247,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+               <Landmark size={18} color={THEME.purple} />
+             </div>
+             <div>
+               <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 700 }}>Generate Settlement</h3>
+               <p style={{ margin: 0, fontSize: "0.8rem", color: THEME.muted }}>Buat tagihan bulanan</p>
+             </div>
           </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <input type="number" value={genYear} onChange={e => setGenYear(e.target.value)} style={{ flex: "1 1 80px", padding: "12px", borderRadius: 12, background: THEME.bg, border: `1px solid ${THEME.border}`, color: THEME.text, outline: "none" }} placeholder="Tahun" />
+            <input type="number" value={genMonth} onChange={e => setGenMonth(e.target.value)} min="1" max="12" style={{ flex: "1 1 80px", padding: "12px", borderRadius: 12, background: THEME.bg, border: `1px solid ${THEME.border}`, color: THEME.text, outline: "none" }} placeholder="Bulan" />
+            <button onClick={generate} disabled={generating} style={{ flex: "1 1 100%", padding: "12px 20px", borderRadius: 12, border: "none", background: "rgba(168,85,247,0.15)", color: THEME.purple, fontWeight: 700, cursor: "pointer" }}>{generating ? "Memproses..." : "Generate Data"}</button>
+          </div>
+        </div>
+      </div>
 
-          <button
-            type="button"
-            onClick={handleExport}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 text-xs font-semibold text-slate-300 transition hover:bg-white/5 hover:text-white"
-          >
-            <Download size={15} />
-            Export Settlement
+      {/* SEARCH & FILTER */}
+      <div style={{ backgroundColor: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 18, padding: 20, display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", background: THEME.bg, border: `1px solid ${THEME.border}`, borderRadius: 12, padding: "0 14px", flex: "1 1 300px" }}>
+          <Search size={18} color={THEME.dim} />
+          <input type="text" placeholder="Cari settlement code atau organizer..." value={search} onChange={e => setSearch(e.target.value)} style={{ width: "100%", background: "none", border: "none", padding: "12px", color: THEME.text, outline: "none", fontSize: "0.9rem" }} />
+        </div>
+        <div style={{ position: "relative" }}>
+          <button onClick={() => setShowFilter(!showFilter)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", background: THEME.bg, border: `1px solid ${THEME.border}`, borderRadius: 12, color: THEME.text, cursor: "pointer", fontSize: "0.85rem" }}>
+            <Filter size={14} /> {statusFilter === "all" ? "Semua Status" : settlementStatus[statusFilter]?.label} <ChevronDown size={14} />
           </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <StatCard
-          title="Total GMV"
-          value={formatCurrency(totals.gmv)}
-          icon={CircleDollarSign}
-          iconClass="bg-purple-500/10 text-purple-400"
-        />
-
-        <StatCard
-          title="Platform Revenue"
-          value={formatCurrency(totals.platformFee)}
-          icon={Percent}
-          iconClass="bg-cyan-500/10 text-cyan-400"
-        />
-
-        <StatCard
-          title="Refund"
-          value={formatCurrency(totals.refund)}
-          icon={ArrowDownToLine}
-          iconClass="bg-blue-500/10 text-blue-400"
-        />
-
-        <StatCard
-          title="Pending Payout"
-          value={formatCurrency(pendingAmount)}
-          icon={Clock3}
-          iconClass="bg-yellow-500/10 text-yellow-400"
-        />
-
-        <StatCard
-          title="Settled Payout"
-          value={formatCurrency(settledAmount)}
-          icon={Check}
-          iconClass="bg-emerald-500/10 text-emerald-400"
-        />
-      </div>
-
-      <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-[1fr_360px]">
-        <div className="rounded-2xl border border-white/10 bg-[#0d1422] p-5">
-          <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400">
-              <Percent size={18} />
-            </div>
-
-            <div>
-              <h2 className="text-sm font-semibold text-white">
-                Platform Fee
-              </h2>
-
-              <p className="mt-1 text-xs leading-5 text-slate-500">
-                Fee platform dihitung dari GMV transaksi tiket
-                sebelum payout kepada EO.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="flex-1">
-              <label className="mb-2 block text-[10px] font-semibold uppercase tracking-wider text-slate-600">
-                Commission Percentage
-              </label>
-
-              <div className="relative">
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.1"
-                  value={feeInput}
-                  onChange={(event) =>
-                    setFeeInput(event.target.value)
-                  }
-                  className="h-11 w-full rounded-xl border border-white/10 bg-[#090f1b] px-4 pr-10 text-sm font-semibold text-white outline-none transition focus:border-emerald-500/40"
-                />
-
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-600">
-                  %
-                </span>
+          {showFilter && (
+            <>
+              <div style={{ position: "fixed", inset: 0, zIndex: 10 }} onClick={() => setShowFilter(false)} />
+              <div style={{ position: "absolute", right: 0, top: 44, background: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 12, padding: 6, zIndex: 20, minWidth: 160, boxShadow: "0 10px 25px rgba(0,0,0,0.5)" }}>
+                {["all", "pending", "processing", "settled"].map(s => (
+                  <button key={s} onClick={() => { setStatusFilter(s); setShowFilter(false); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 12px", background: "none", border: "none", color: statusFilter === s ? THEME.pink : THEME.muted, fontSize: "0.85rem", cursor: "pointer", borderRadius: 8 }}>
+                    {s === "all" ? "Semua Status" : settlementStatus[s]?.label}
+                  </button>
+                ))}
               </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleSaveFee}
-              className="h-11 rounded-xl bg-emerald-500 px-5 text-xs font-bold text-black transition hover:bg-emerald-400"
-            >
-              Simpan Fee
-            </button>
-          </div>
-
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
-              <p className="text-[10px] text-slate-600">
-                Current Fee
-              </p>
-
-              <p className="mt-1 text-sm font-bold text-emerald-400">
-                {platformFee}%
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
-              <p className="text-[10px] text-slate-600">
-                Est. Platform Revenue
-              </p>
-
-              <p className="mt-1 text-sm font-bold text-white">
-                {formatCurrency(
-                  Math.round((totals.gmv * platformFee) / 100)
-                )}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-white/10 bg-[#0d1422] p-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/10 text-purple-400">
-              <Landmark size={18} />
-            </div>
-
-            <div>
-              <h2 className="text-sm font-semibold text-white">
-                Settlement Summary
-              </h2>
-
-              <p className="mt-1 text-xs text-slate-500">
-                Ringkasan dana yang akan dibayarkan ke EO.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-500">
-                Gross Merchandise Value
-              </span>
-
-              <span className="text-xs font-semibold text-white">
-                {formatCurrency(totals.gmv)}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-500">
-                Platform Fee
-              </span>
-
-              <span className="text-xs font-semibold text-purple-400">
-                - {formatCurrency(totals.platformFee)}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-500">
-                Refund
-              </span>
-
-              <span className="text-xs font-semibold text-blue-400">
-                - {formatCurrency(totals.refund)}
-              </span>
-            </div>
-
-            <div className="border-t border-white/10 pt-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-400">
-                  Total EO Payout
-                </span>
-
-                <span className="text-base font-bold text-emerald-400">
-                  {formatCurrency(totals.payout)}
-                </span>
-              </div>
-            </div>
-          </div>
+            </>
+          )}
         </div>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-white/10 bg-[#0d1422] p-4 sm:p-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="relative w-full lg:max-w-lg">
-            <Search
-              size={17}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600"
-            />
-
-            <input
-              type="text"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Cari settlement ID, organizer, atau periode..."
-              className="h-11 w-full rounded-xl border border-white/10 bg-[#090f1b] pl-10 pr-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-purple-500/40"
-            />
-          </div>
-
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowFilter(!showFilter)}
-              className="flex h-11 w-full items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.02] px-4 text-xs font-semibold text-slate-300 transition hover:bg-white/5 hover:text-white sm:w-44"
-            >
-              <span className="flex items-center gap-2">
-                <Filter size={14} />
-
-                {statusFilter === "all"
-                  ? "Semua Status"
-                  : settlementStatus[statusFilter]?.label}
-              </span>
-
-              <ChevronDown
-                size={15}
-                className={`transition ${
-                  showFilter ? "rotate-180" : ""
-                }`}
-              />
-            </button>
-
-            {showFilter && (
-              <>
-                <button
-                  type="button"
-                  aria-label="Close filter"
-                  onClick={() => setShowFilter(false)}
-                  className="fixed inset-0 z-10 cursor-default"
-                />
-
-                <div className="absolute right-0 top-12 z-20 w-44 rounded-xl border border-white/10 bg-[#151c2c] p-1.5 shadow-2xl">
-                  {[
-                    { value: "all", label: "Semua Status" },
-                    { value: "pending", label: "Pending" },
-                    {
-                      value: "processing",
-                      label: "Processing",
-                    },
-                    { value: "settled", label: "Settled" },
-                  ].map((item) => (
-                    <button
-                      key={item.value}
-                      type="button"
-                      onClick={() => {
-                        setStatusFilter(item.value);
-                        setShowFilter(false);
-                      }}
-                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-xs transition ${
-                        statusFilter === item.value
-                          ? "bg-purple-500/10 text-purple-400"
-                          : "text-slate-400 hover:bg-white/5 hover:text-white"
-                      }`}
-                    >
-                      {item.label}
-
-                      {statusFilter === item.value && (
-                        <Check size={14} />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-[#0d1422]">
-        <div className="border-b border-white/10 px-5 py-4">
-          <h2 className="text-sm font-semibold text-white">
-            Settlement Organizer
-          </h2>
-
-          <p className="mt-1 text-xs text-slate-500">
-            {filteredSettlements.length} settlement ditemukan
-          </p>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1200px]">
+      {/* TABLE */}
+      <div style={{ backgroundColor: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 18, overflow: "hidden" }}>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", minWidth: 900, borderCollapse: "collapse", fontSize: "0.85rem" }}>
             <thead>
-              <tr className="border-b border-white/5 bg-white/[0.015] text-left">
-                <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Settlement
-                </th>
-
-                <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Organizer
-                </th>
-
-                <th className="px-5 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  GMV
-                </th>
-
-                <th className="px-5 py-4 text-right text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Platform Fee
-                </th>
-
-                <th className="px-5 py-4 text-right text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Refund
-                </th>
-
-                <th className="px-5 py-4 text-right text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  EO Payout
-                </th>
-
-                <th className="px-5 py-4 text-center text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Status
-                </th>
-
-                <th className="px-5 py-4 text-right text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  Action
-                </th>
+              <tr style={{ borderBottom: `1px solid ${THEME.border}`, textAlign: "left", color: THEME.muted, background: "rgba(255,255,255,0.02)" }}>
+                <th style={{ padding: "16px 20px", fontWeight: 600 }}>Settlement</th>
+                <th style={{ padding: "16px 20px", fontWeight: 600 }}>Organizer</th>
+                <th style={{ padding: "16px 20px", fontWeight: 600, textAlign: "right" }}>Payout</th>
+                <th style={{ padding: "16px 20px", fontWeight: 600, textAlign: "center" }}>Status</th>
+                <th style={{ padding: "16px 20px", fontWeight: 600, textAlign: "right" }}>Action</th>
               </tr>
             </thead>
-
             <tbody>
-              {filteredSettlements.length > 0 ? (
-                filteredSettlements.map((settlement) => (
-                  <tr
-                    key={settlement.id}
-                    className="border-b border-white/5 transition hover:bg-white/[0.02]"
-                  >
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
-                          <Landmark size={16} />
-                        </div>
-
-                        <div>
-                          <p className="text-xs font-semibold text-white">
-                            {settlement.id}
-                          </p>
-
-                          <p className="mt-1 text-[10px] text-slate-600">
-                            {settlement.period}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <p className="text-xs font-medium text-slate-300">
-                        {settlement.organizer}
-                      </p>
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <p className="text-xs font-semibold text-white">
-                        {formatCurrency(settlement.gmv)}
-                      </p>
-                    </td>
-
-                    <td className="px-5 py-4 text-right">
-                      <p className="text-xs font-semibold text-purple-400">
-                        {formatCurrency(settlement.platformFee)}
-                      </p>
-
-                      <p className="mt-1 text-[9px] text-slate-600">
-                        {platformFee}%
-                      </p>
-                    </td>
-
-                    <td className="px-5 py-4 text-right">
-                      <p className="text-xs font-semibold text-blue-400">
-                        {formatCurrency(settlement.refund)}
-                      </p>
-                    </td>
-
-                    <td className="px-5 py-4 text-right">
-                      <p className="text-xs font-bold text-emerald-400">
-                        {formatCurrency(settlement.payout)}
-                      </p>
-                    </td>
-
-                    <td className="px-5 py-4 text-center">
-                      <StatusBadge status={settlement.status} />
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <div className="relative flex justify-end">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setMenuId(
-                              menuId === settlement.id
-                                ? null
-                                : settlement.id
-                            )
-                          }
-                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-slate-400 transition hover:bg-white/5 hover:text-white"
-                        >
-                          <MoreHorizontal size={17} />
-                        </button>
-
-                        {menuId === settlement.id && (
-                          <>
-                            <button
-                              type="button"
-                              aria-label="Close menu"
-                              onClick={() => setMenuId(null)}
-                              className="fixed inset-0 z-10 cursor-default"
-                            />
-
-                            <div className="absolute right-0 top-11 z-20 w-52 rounded-xl border border-white/10 bg-[#151c2c] p-1.5 shadow-2xl">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedSettlement(
-                                    settlement
-                                  );
-                                  setMenuId(null);
-                                }}
-                                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-slate-300 transition hover:bg-white/5 hover:text-white"
-                              >
-                                <Eye size={15} />
-                                Lihat Detail
-                              </button>
-
-                              {settlement.status === "pending" && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleProcessSettlement(
-                                      settlement.id
-                                    )
-                                  }
-                                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-blue-400 transition hover:bg-blue-500/10"
-                                >
-                                  <Clock3 size={15} />
-                                  Process Settlement
-                                </button>
-                              )}
-
-                              {settlement.status === "processing" && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleCompleteSettlement(
-                                      settlement.id
-                                    )
-                                  }
-                                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-emerald-400 transition hover:bg-emerald-500/10"
-                                >
-                                  <Check size={15} />
-                                  Mark as Settled
-                                </button>
-                              )}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
+              {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="px-5 py-16 text-center">
-                    <div className="flex flex-col items-center">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/5 text-slate-600">
-                        <Landmark size={20} />
+                  <td colSpan="5" style={{ padding: "40px", textAlign: "center", color: THEME.muted }}>
+                    Belum ada data settlement. Lakukan transaksi dan klik "Generate Data".
+                  </td>
+                </tr>
+              ) : filtered.map(s => (
+                <tr key={s.id} style={{ borderBottom: `1px solid ${THEME.border}` }}>
+                  <td style={{ padding: "16px 20px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(16,185,129,0.1)", display: "flex", alignItems: "center", justifyContent: "center", color: THEME.success }}>
+                        <Landmark size={16} />
                       </div>
-
-                      <p className="mt-3 text-sm font-medium text-slate-400">
-                        Settlement tidak ditemukan
-                      </p>
-
-                      <p className="mt-1 text-xs text-slate-600">
-                        Coba gunakan kata kunci atau filter yang
-                        berbeda.
-                      </p>
+                      <div>
+                        <p style={{ margin: 0, fontWeight: 600, color: THEME.text }}>{s.settlement_code}</p>
+                        <p style={{ margin: 0, fontSize: "0.75rem", color: THEME.muted }}>Periode: {s.period_month}/{s.period_year}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{ padding: "16px 20px", color: THEME.text }}>{s.organizer?.organization_name || s.organizer?.name || "-"}</td>
+                  <td style={{ padding: "16px 20px", textAlign: "right", fontWeight: 600, color: THEME.success }}>{formatCurrency(s.payout)}</td>
+                  <td style={{ padding: "16px 20px", textAlign: "center" }}><StatusBadge status={s.status} /></td>
+                  <td style={{ padding: "16px 20px", textAlign: "right" }}>
+                    <div style={{ position: "relative", display: "inline-block" }}>
+                      <button onClick={() => setMenuId(menuId === s.id ? null : s.id)} style={{ background: "none", border: `1px solid ${THEME.border}`, borderRadius: 8, padding: "6px 8px", color: THEME.muted, cursor: "pointer" }}>
+                        <MoreHorizontal size={16} />
+                      </button>
+                      {menuId === s.id && (
+                        <>
+                          <div style={{ position: "fixed", inset: 0, zIndex: 10 }} onClick={() => setMenuId(null)} />
+                          <div style={{ position: "absolute", right: 0, top: 36, background: THEME.surface, border: `1px solid ${THEME.border}`, borderRadius: 12, padding: 6, zIndex: 20, minWidth: 160, boxShadow: "0 10px 25px rgba(0,0,0,0.5)", textAlign: "left" }}>
+                            <button onClick={() => { setSelectedId(s.id); setMenuId(null); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "10px 12px", background: "none", border: "none", color: THEME.text, fontSize: "0.85rem", cursor: "pointer" }}><Eye size={14} /> Detail</button>
+                            {s.status === "pending" && (
+                              <button onClick={() => { handleUpdateSettlementStatus(s.id, "processing"); setMenuId(null); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "10px 12px", background: "none", border: "none", color: THEME.purple, fontSize: "0.85rem", cursor: "pointer" }}><Clock3 size={14} /> Proses</button>
+                            )}
+                            {s.status === "processing" && (
+                              <button onClick={() => { handleUpdateSettlementStatus(s.id, "settled"); setMenuId(null); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "10px 12px", background: "none", border: "none", color: THEME.success, fontSize: "0.85rem", cursor: "pointer" }}><Check size={14} /> Settle</button>
+                            )}
+                          </div>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
-              )}
+              ))}
             </tbody>
           </table>
         </div>
       </div>
 
+      {/* MODAL DETAIL */}
       {selectedSettlement && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-white/10 bg-[#101827] shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-              <div>
-                <h2 className="text-base font-semibold text-white">
-                  Settlement Detail
-                </h2>
-
-                <p className="mt-1 text-xs text-slate-500">
-                  Rincian payout organizer
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setSelectedSettlement(null)}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/5 hover:text-white"
-              >
-                <X size={18} />
-              </button>
+        <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ background: THEME.surface, borderRadius: 20, border: `1px solid ${THEME.border}`, maxWidth: 500, width: "100%", padding: 24 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 800 }}>Detail Settlement</h3>
+              <button onClick={() => setSelectedId(null)} style={{ background: "none", border: "none", color: THEME.muted, cursor: "pointer" }}><X size={20} /></button>
             </div>
-
-            <div className="p-5">
-              <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400">
-                      <Landmark size={19} />
-                    </div>
-
-                    <div>
-                      <p className="text-sm font-semibold text-white">
-                        {selectedSettlement.id}
-                      </p>
-
-                      <p className="mt-1 text-[11px] text-slate-500">
-                        {selectedSettlement.organizer}
-                      </p>
-                    </div>
-                  </div>
-
-                  <StatusBadge
-                    status={selectedSettlement.status}
-                  />
-                </div>
-              </div>
-
-              <div className="mt-4 space-y-3">
-                <div className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3">
-                  <span className="text-xs text-slate-500">
-                    Settlement Period
-                  </span>
-
-                  <span className="text-xs font-semibold text-white">
-                    {selectedSettlement.period}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3">
-                  <span className="text-xs text-slate-500">
-                    Due Date
-                  </span>
-
-                  <span className="text-xs font-semibold text-white">
-                    {selectedSettlement.dueDate}
-                  </span>
-                </div>
-
-                <div className="space-y-2 rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                  <div className="flex justify-between">
-                    <span className="text-xs text-slate-500">
-                      GMV
-                    </span>
-
-                    <span className="text-xs font-semibold text-white">
-                      {formatCurrency(selectedSettlement.gmv)}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span className="text-xs text-slate-500">
-                      Platform Fee ({platformFee}%)
-                    </span>
-
-                    <span className="text-xs font-semibold text-purple-400">
-                      -{" "}
-                      {formatCurrency(
-                        selectedSettlement.platformFee
-                      )}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span className="text-xs text-slate-500">
-                      Refund
-                    </span>
-
-                    <span className="text-xs font-semibold text-blue-400">
-                      -{" "}
-                      {formatCurrency(
-                        selectedSettlement.refund
-                      )}
-                    </span>
-                  </div>
-
-                  <div className="border-t border-white/10 pt-3">
-                    <div className="flex justify-between">
-                      <span className="text-xs font-semibold text-slate-400">
-                        EO Payout
-                      </span>
-
-                      <span className="text-base font-bold text-emerald-400">
-                        {formatCurrency(
-                          selectedSettlement.payout
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-5 flex gap-2">
-                {selectedSettlement.status === "pending" && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleProcessSettlement(
-                        selectedSettlement.id
-                      )
-                    }
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-blue-500/10 px-4 py-3 text-xs font-bold text-blue-400 transition hover:bg-blue-500/20"
-                  >
-                    <Clock3 size={15} />
-                    Process
-                  </button>
-                )}
-
-                {selectedSettlement.status === "processing" && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleCompleteSettlement(
-                        selectedSettlement.id
-                      )
-                    }
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-500/10 px-4 py-3 text-xs font-bold text-emerald-400 transition hover:bg-emerald-500/20"
-                  >
-                    <Check size={15} />
-                    Mark Settled
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedSettlement(null)}
-                  className="rounded-xl border border-white/10 px-5 py-3 text-xs font-semibold text-slate-400 transition hover:bg-white/5 hover:text-white"
-                >
-                  Tutup
-                </button>
-              </div>
+            <div style={{ background: THEME.bg, padding: 16, borderRadius: 12, marginBottom: 16 }}>
+               <h4 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700 }}>{selectedSettlement.settlement_code}</h4>
+               <p style={{ margin: "4px 0 10px", fontSize: "0.85rem", color: THEME.muted }}>{selectedSettlement.organizer?.organization_name || selectedSettlement.organizer?.name || "-"}</p>
+               <StatusBadge status={selectedSettlement.status} />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9rem" }}><span style={{ color: THEME.muted }}>GMV</span><span style={{ fontWeight: 600 }}>{formatCurrency(selectedSettlement.gmv)}</span></div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9rem" }}><span style={{ color: THEME.muted }}>Platform Fee</span><span style={{ fontWeight: 600, color: THEME.pink }}>- {formatCurrency(selectedSettlement.platform_fee)}</span></div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9rem" }}><span style={{ color: THEME.muted }}>Refund</span><span style={{ fontWeight: 600, color: THEME.purple }}>- {formatCurrency(selectedSettlement.refund)}</span></div>
+              <div style={{ height: 1, background: THEME.border, margin: "4px 0" }} />
+              <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ color: THEME.text, fontWeight: 700 }}>Payout Bersih</span><span style={{ color: THEME.success, fontWeight: 800, fontSize: "1.2rem" }}>{formatCurrency(selectedSettlement.payout)}</span></div>
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              {selectedSettlement.status === "pending" && <button onClick={() => { handleUpdateSettlementStatus(selectedSettlement.id, "processing"); setSelectedId(null); }} style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", background: "rgba(168,85,247,0.1)", color: THEME.purple, fontWeight: 700, cursor: "pointer" }}>Proses</button>}
+              {selectedSettlement.status === "processing" && <button onClick={() => { handleUpdateSettlementStatus(selectedSettlement.id, "settled"); setSelectedId(null); }} style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", background: THEME.success, color: "#fff", fontWeight: 700, cursor: "pointer" }}>Settle</button>}
+              <button onClick={() => setSelectedId(null)} style={{ padding: "12px 20px", borderRadius: 10, border: `1px solid ${THEME.border}`, background: "transparent", color: THEME.muted, fontWeight: 600, cursor: "pointer" }}>Tutup</button>
             </div>
           </div>
         </div>
